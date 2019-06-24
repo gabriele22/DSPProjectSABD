@@ -1,5 +1,6 @@
 package utils;
 
+import com.google.gson.Gson;
 import config.ConfigurationKafka;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.PartitionInfo;
@@ -13,7 +14,7 @@ import java.util.Properties;
 
 public class KakfaConsumer implements Runnable {
 
-//    private final static String TOPIC = "a-simple-testing-topic";
+    private Gson gson;
 
     private final static String CONSUMER_GROUP_ID = "consumer";
 
@@ -26,6 +27,7 @@ public class KakfaConsumer implements Runnable {
         this.id = id;
         this.topic = topic;
         consumer = createConsumer();
+        gson = new Gson();
 
         subscribeToTopic();
 
@@ -82,10 +84,13 @@ public class KakfaConsumer implements Runnable {
                 Thread.sleep(1000);
                 ConsumerRecords<String, String> records =
                         consumer.poll(Duration.ofMillis(1000));
-                for (ConsumerRecord<String, String> record : records)
+                for (ConsumerRecord<String, String> record : records) {
+                    Comment comment = gson.fromJson(record.value(), Comment.class);
                     System.out.println("[" + id + "] Consuming record:" +
                             " (key=" + record.key() + ", " +
-                            "val=" + record.value() + ")");
+                            "val=" + comment.toString() + ")");
+
+                }
             }
         } catch (InterruptedException e) {
             e.printStackTrace();

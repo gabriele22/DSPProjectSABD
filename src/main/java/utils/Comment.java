@@ -1,4 +1,4 @@
-
+package utils;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -20,12 +20,31 @@ public class Comment implements Serializable {
     private int recommendations;
     private String sectionName;
     private String userDisplayName;
-    private int UserID;
-    private String UserLocation;
-
+    private int userID;
+    private String userLocation;
 
 
     public Comment() {
+    }
+
+    public Comment(String approveDate, String articleId, String articleWordCount, String commentID, String commentType,
+                   String createDate, String depth, String editorSelection, String inReplyTo, String parentUserDisplayName,
+                   String recommendations, String sectionName, String userDisplayName, String userID, String userLocation) {
+        this.approveDate = fromUnixTimeToUTC(approveDate);
+        this.articleId = articleId;
+        this.articleWordCount = Integer.parseUnsignedInt(articleWordCount);
+        this.commentID = Integer.parseUnsignedInt(commentID);
+        this.commentType = commentType;
+        this.createDate = fromUnixTimeToUTC(createDate);
+        this.depth = Integer.parseInt(depth);
+        this.editorSelection = Boolean.parseBoolean(editorSelection);
+        this.inReplyTo = Integer.parseUnsignedInt(inReplyTo);
+        this.parentUserDisplayName = parentUserDisplayName;
+        this.recommendations = Integer.parseInt(recommendations);
+        this.sectionName = sectionName;
+        this.userDisplayName = userDisplayName;
+        this.userID = Integer.parseUnsignedInt(userID);
+        this.userLocation = userLocation;
     }
 
     private static Date fromUnixTimeToUTC(String timestamp){
@@ -141,22 +160,40 @@ public class Comment implements Serializable {
     }
 
     public int getUserID() {
-        return UserID;
+        return userID;
     }
 
     public void setUserID(String userID) {
-        UserID =  Integer.parseUnsignedInt(userID);
+        this.userID =  Integer.parseUnsignedInt(userID);
     }
 
     public String getUserLocation() {
-        return UserLocation;
+        return userLocation;
     }
 
     public void setUserLocation(String userLocation) {
-        UserLocation = userLocation;
+        this.userLocation = userLocation;
     }
 
-
-
-
+    @Override
+    public String toString() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        return "Comment{" +
+                "approveDate=" + approveDate.toString() +
+                ", articleId='" + articleId + '\'' +
+                ", articleWordCount=" + articleWordCount +
+                ", commentID=" + commentID +
+                ", commentType='" + commentType + '\'' +
+                ", createDate=" + createDate.toString() +
+                ", depth=" + depth +
+                ", editorSelection=" + editorSelection +
+                ", inReplyTo=" + inReplyTo +
+                ", parentUserDisplayName='" + parentUserDisplayName + '\'' +
+                ", recommendations=" + recommendations +
+                ", sectionName='" + sectionName + '\'' +
+                ", userDisplayName='" + userDisplayName + '\'' +
+                ", userID=" + userID +
+                ", userLocation='" + userLocation + '\'' +
+                '}';
+    }
 }

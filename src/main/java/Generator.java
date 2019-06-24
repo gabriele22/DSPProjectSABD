@@ -7,6 +7,7 @@ import java.util.GregorianCalendar;
 import java.util.TimeZone;
 import com.google.gson.Gson;
 import config.ConfigurationKafka;
+import utils.Comment;
 import utils.KakfaProducer;
 
 
@@ -37,21 +38,13 @@ public class Generator implements Runnable{
 //ad esempio se timespan è 15 minuti e speedup è 1000ms è come se 15 minuti diventassero un secondo
     private static final int TIMESPAN = 15; 		// expressed in mins
     private static final int SPEEDUP = 1000; 	// expressed in ms
-    private static int SHORT_SLEEP = 10;		// expressed in ms
 
     private String filename;
     private Gson gson;
 
     public Generator(String filename){
-
         this.filename = filename;
         this.gson = new Gson();
-
-        initialize();
-    }
-
-    private void initialize(){
-
     }
 
     @Override
@@ -144,7 +137,15 @@ public class Generator implements Runnable{
 
         try {
             for (int i = 0; i < linesBatch.getLines().size(); i++) {
-                producer.produce(null, linesBatch.getLines().get(i));
+                String[] tokens	=	linesBatch.getLines().get(i).split(",");
+
+                Comment comment = new Comment(tokens[0],tokens[1],tokens[2],tokens[3],
+                        tokens[4],tokens[5],tokens[6],tokens[7],tokens[8],tokens[9],
+                        tokens[10],tokens[11],tokens[12],tokens[13],tokens[14]);
+
+                String jsonString = gson.toJson(comment);
+
+                producer.produce(tokens[3], jsonString);
             }
         } catch (Exception e) {
             e.printStackTrace();
