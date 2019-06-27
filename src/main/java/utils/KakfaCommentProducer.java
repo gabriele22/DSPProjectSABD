@@ -8,22 +8,22 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
-public class KakfaProducer {
+public class KakfaCommentProducer {
 
 
 
     private String topic;
 
-    private Producer<String, String> producer;
+    private Producer<String, Comment> producer;
 
-    public KakfaProducer(String topic) {
+    public KakfaCommentProducer(String topic) {
 
         this.topic = topic;
         producer = createProducer();
 
     }
 
-    private static Producer<String, String> createProducer() {
+    private static Producer<String, Comment> createProducer() {
 
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, ConfigurationKafka.BOOTSTRAP_SERVERS);
@@ -32,15 +32,15 @@ public class KakfaProducer {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
-        return new KafkaProducer<String, String>(props);
+        return new KafkaProducer<String, Comment>(props,new StringSerializer(),new KafkaJsonSerializer());
     }
 
-    public void produce(String key, String value) {
+    public void produce(String key, Comment comment) {
 
 
         try {
 
-            final ProducerRecord<String, String> record = new ProducerRecord<String, String>(topic, key, value);
+            final ProducerRecord<String, Comment> record = new ProducerRecord<>(topic, key, comment);
 
             RecordMetadata metadata = producer.send(record).get();
 

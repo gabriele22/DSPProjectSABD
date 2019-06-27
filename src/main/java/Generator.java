@@ -1,14 +1,11 @@
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.TimeZone;
-import com.google.gson.Gson;
+import java.util.*;
+
 import config.ConfigurationKafka;
 import utils.Comment;
-import utils.KakfaProducer;
+import utils.KakfaCommentProducer;
 
 
 public class Generator implements Runnable{
@@ -40,20 +37,16 @@ public class Generator implements Runnable{
     private static final int SPEEDUP = 1000; 	// expressed in ms
 
     private String filename;
-    private Gson gson;
 
     public Generator(String filename){
         this.filename = filename;
-        this.gson = new Gson();
     }
 
     @Override
     public void run() {
 
-
-
         BufferedReader br = null;
-        LinesBatch linesBatch = null;
+        LinesBatch linesBatch;
 
         try {
             System.out.println("Initializing... ");
@@ -69,7 +62,6 @@ public class Generator implements Runnable{
             System.out.println(" batch init  " + new Date(batchInitialTime).toString());
             System.out.println(" batch final " + new Date(batchFinalTime).toString());
 
-            System.out.println("Read: " + line);
             linesBatch.addLine(line);
 
             while ((line = br.readLine()) != null) {
@@ -80,8 +72,6 @@ public class Generator implements Runnable{
                     linesBatch.addLine(line);
                     continue;
                 }
-
-                System.out.println("Sending " + linesBatch.getLines().size() + " lines");
 
                 /* batch is concluded and has to be sent */
                 send(linesBatch);
@@ -133,32 +123,42 @@ public class Generator implements Runnable{
     }
 
     private void send(LinesBatch linesBatch) {
-        KakfaProducer producer = new KakfaProducer(ConfigurationKafka.TOPIC);
+        KakfaCommentProducer producer = new KakfaCommentProducer(ConfigurationKafka.TOPIC);
 
         try {
             for (int i = 0; i < linesBatch.getLines().size(); i++) {
-                String[] tokens	=	linesBatch.getLines().get(i).split(",");
+                String[] tokensUnchecked	=linesBatch.getLines().get(i).split(",");
 
-                Comment comment = new Comment(tokens[0],tokens[1],tokens[2],tokens[3],
-                        tokens[4],tokens[5],tokens[6],tokens[7],tokens[8],tokens[9],
-                        tokens[10],tokens[11],tokens[12],tokens[13],tokens[14]);
+                String[] tokens = controlFieldWithString(tokensUnchecked);
 
-                String jsonString = gson.toJson(comment);
+                Comment comment = null;
+                String  commentId = null;
+                if(tokens.length==15) {
+                    comment = new Comment(tokens[0], tokens[1], tokens[2], tokens[3],
+                            tokens[4], tokens[5], tokens[6], tokens[7], tokens[8], tokens[9],
+                            tokens[10], tokens[11], tokens[12], tokens[13], tokens[14]);
 
-                producer.produce(tokens[3], jsonString);
+                    commentId = tokens[3];
+
+                    //send on kafka
+                    producer.produce(commentId, comment);
+                }
+
+
+
             }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             producer.close();
         }
+        System.out.println("Sending " + linesBatch.getLines().size() + " lines");
 
     }
 
     private long getDropoffDatatime(String line){
 
         String[] tokens	=	line.split(",");
-        //METTERE 5!
         long ts = Long.valueOf(tokens[5])*1000;
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         Date d= new Date(ts);
@@ -178,19 +178,35 @@ public class Generator implements Runnable{
 
     }
 
+    private String[] controlFieldWithString(String[] fields){
+        ArrayList<String> temp =  new ArrayList<>();
+
+
+        for(int i=0; i<fields.length-1;i++) {
+            if (!fields[i].startsWith("\042"))
+                temp.add(fields[i]);
+            else {
+                String u = fields[i] /*+", "*/ + fields[i + 1];
+                temp.add(u);
+                i++;
+            }
+        }
+
+/*                for (int t = i+2; t < fields.length -1; t++) {
+                    if(!fields[t].startsWith("\042"))
+                        temp.add(fields[t]);
+                }*/
+
+        return temp.toArray(fields);
+
+    }
+
     private long computeBatchFinalTime(long initialTime){
 
         return initialTime + TIMESPAN * 60 * 1000;
     }
 
 
-    /**
-     * This component reads data from the debs dataset
-     * and feeds the Storm topology by publishing data
-     * on Redis.
-     *
-     * @param args
-     */
     public static void main(String[] args) {
 
         /* TODO:

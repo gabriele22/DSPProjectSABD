@@ -18,4 +18,5 @@ public class ConfigurationKafka {
 
     public static final String PRODUCER_ID = "producer";
     public static final String TOPIC = "comments";
+    public final static String CONSUMER_GROUP_ID = "consumer";
 }

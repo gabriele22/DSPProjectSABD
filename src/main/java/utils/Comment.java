@@ -7,58 +7,69 @@ import java.util.TimeZone;
 public class Comment implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private Date approveDate;
+    private String approveDate;
     private String articleId;
-    private int articleWordCount;
-    private int commentID;
+    private String articleWordCount;
+    private String commentID;
     private String commentType;
-    private Date createDate;
-    private int depth;
-    private boolean editorSelection;
-    private int inReplyTo;
+    private String createDate;
+    private String depth;
+    private String editorsSelection;
+    private String inReplyTo;
     private String parentUserDisplayName;
-    private int recommendations;
+    private String recommendations;
     private String sectionName;
     private String userDisplayName;
-    private int userID;
+    private String userID;
     private String userLocation;
 
 
     public Comment() {
     }
 
-    public Comment(String approveDate, String articleId, String articleWordCount, String commentID, String commentType,
-                   String createDate, String depth, String editorSelection, String inReplyTo, String parentUserDisplayName,
-                   String recommendations, String sectionName, String userDisplayName, String userID, String userLocation) {
-        this.approveDate = fromUnixTimeToUTC(approveDate);
+    public Comment(String articleId, String createDate) {
         this.articleId = articleId;
-        this.articleWordCount = Integer.parseUnsignedInt(articleWordCount);
-        this.commentID = Integer.parseUnsignedInt(commentID);
+        this.createDate = createDate;
+    }
+
+    public Comment(String approveDate, String articleId, String articleWordCount, String commentID,
+                   String commentType, String createDate, String depth, String editorsSelection,
+                   String inReplyTo, String parentUserDisplayName, String recommendations,
+                   String sectionName, String userDisplayName, String userID, String userLocation) {
+        this.approveDate = approveDate;
+        this.articleId = articleId;
+        this.articleWordCount = articleWordCount;
+        this.commentID = commentID;
         this.commentType = commentType;
-        this.createDate = fromUnixTimeToUTC(createDate);
-        this.depth = Integer.parseInt(depth);
-        this.editorSelection = Boolean.parseBoolean(editorSelection);
-        this.inReplyTo = Integer.parseUnsignedInt(inReplyTo);
+        this.createDate = createDate;
+        this.depth = depth;
+        this.editorsSelection = editorsSelection;
+        this.inReplyTo = inReplyTo;
         this.parentUserDisplayName = parentUserDisplayName;
-        this.recommendations = Integer.parseInt(recommendations);
+        this.recommendations = recommendations;
         this.sectionName = sectionName;
         this.userDisplayName = userDisplayName;
-        this.userID = Integer.parseUnsignedInt(userID);
+        this.userID = userID;
         this.userLocation = userLocation;
     }
 
-    private static Date fromUnixTimeToUTC(String timestamp){
+    public static Date fromUnixTimeToUTC(String timestamp){
         long ts = Long.valueOf(timestamp)*1000;
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         return new Date(ts);
     }
+    public static Date fromUnixTimeToUTC2(long timestamp){
+        long ts = timestamp*1000;
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        return new Date(ts);
+    }
 
-    public Date getApproveDate() {
-        return approveDate;
+    public long getApproveDate() {
+        return fromUnixTimeToUTC(approveDate).getTime();
     }
 
     public void setApproveDate(String approveDate) {
-        this.approveDate = fromUnixTimeToUTC(approveDate);
+        this.approveDate = approveDate;
     }
 
     public String getArticleId() {
@@ -69,29 +80,29 @@ public class Comment implements Serializable {
         this.articleId = articleId;
     }
 
-    public Date getCreateDate() {
-        return createDate;
+    public long getCreateDate() {
+        return fromUnixTimeToUTC(createDate).getTime();
     }
 
     public void setCreateDate(String createDate) {
-        this.createDate = fromUnixTimeToUTC(createDate);
+        this.createDate = createDate;
     }
 
     public int getCommentID() {
-        return commentID;
+        return Integer.parseUnsignedInt(commentID);
     }
 
     public void setCommentID(String commentID) {
-        this.commentID = Integer.parseUnsignedInt(commentID);
+        this.commentID = commentID;
     }
 
 
     public int getArticleWordCount() {
-        return articleWordCount;
+        return Integer.parseUnsignedInt(articleWordCount);
     }
 
     public void setArticleWordCount(String articleWordCount) {
-        this.articleWordCount = Integer.parseUnsignedInt(articleWordCount);
+        this.articleWordCount =articleWordCount;
     }
 
     public String getCommentType() {
@@ -103,28 +114,27 @@ public class Comment implements Serializable {
     }
 
     public int getDepth() {
-        return depth;
+        return Integer.parseInt(depth);
     }
 
     public void setDepth(String depth) {
-        this.depth = Integer.parseInt(depth);
+        this.depth = depth;
     }
 
-    public boolean isEditorSelection() {
-        return editorSelection;
+    public boolean getEditorsSelection() {
+        return Boolean.parseBoolean(editorsSelection);
     }
 
-    public void setEditorSelection(String  editorSelection) {
-        this.editorSelection = Boolean.parseBoolean(editorSelection);
+    public void setEditorsSelection(String editorsSelection) {
+        this.editorsSelection = editorsSelection;
     }
 
     public int getInReplyTo() {
-        return inReplyTo;
+        return Integer.parseUnsignedInt(inReplyTo);
     }
 
     public void setInReplyTo(String inReplyTo) {
-        if (!inReplyTo.equals(""))
-            this.inReplyTo =  Integer.parseUnsignedInt(inReplyTo);
+        this.inReplyTo=inReplyTo;
     }
 
     public String getParentUserDisplayName() {
@@ -136,11 +146,11 @@ public class Comment implements Serializable {
     }
 
     public int getRecommendations() {
-        return recommendations;
+        return Integer.parseInt(recommendations);
     }
 
     public void setRecommendations(String recommendations) {
-        this.recommendations = Integer.parseInt(recommendations);
+        this.recommendations = recommendations;
     }
 
     public String getSectionName() {
@@ -160,11 +170,11 @@ public class Comment implements Serializable {
     }
 
     public int getUserID() {
-        return userID;
+        return Integer.parseUnsignedInt(userID);
     }
 
     public void setUserID(String userID) {
-        this.userID =  Integer.parseUnsignedInt(userID);
+        this.userID =  userID;
     }
 
     public String getUserLocation() {
@@ -186,7 +196,7 @@ public class Comment implements Serializable {
                 ", commentType='" + commentType + '\'' +
                 ", createDate=" + createDate.toString() +
                 ", depth=" + depth +
-                ", editorSelection=" + editorSelection +
+                ", editorsSelection=" + editorsSelection +
                 ", inReplyTo=" + inReplyTo +
                 ", parentUserDisplayName='" + parentUserDisplayName + '\'' +
                 ", recommendations=" + recommendations +
