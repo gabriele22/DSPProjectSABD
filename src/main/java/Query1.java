@@ -17,6 +17,8 @@ import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
 import org.apache.flink.streaming.api.watermark.Watermark;
+import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
@@ -33,6 +35,7 @@ import utils.ranking.Rankings;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -135,12 +138,12 @@ public class Query1 {
 
         DataStream<Tuple2<String, Integer>> comment7Days = comment24Hour
                 .keyBy(0)
-                .timeWindow(Time.days(7))
+                .window(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
                 .sum(1).setParallelism(3);
 
 
         DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> ranking7Days = comment7Days
-                .timeWindowAll(Time.days(7))
+                .windowAll(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
                 .process(new Ranking()).setParallelism(1);
 
 
