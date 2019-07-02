@@ -35,23 +35,28 @@ public class Generator implements Runnable{
 
             String line = br.readLine();
             long previousTime = getDateTime(line);
+            long latestSendingTime = System.currentTimeMillis();
             send(line);
 
             while ((line = br.readLine()) != null) {
 
                 long nextTime = getDateTime(line);
                 long sleepTime = (int) Math.floor(((double) (nextTime - previousTime ) / (60*1000)));
-                if(sleepTime<0) sleepTime=0;
+/*                long deltaIntervalToSkip = 1000 - (System.currentTimeMillis() - latestSendingTime);
+                sleepTime = sleepTime+deltaIntervalToSkip;*/
+                if(sleepTime>0) {
 
-                System.out.println(" sleep for :" + sleepTime+ "ms");
+                    System.out.println(" sleep for :" + sleepTime + " ms");
 
-                try {
-                    Thread.sleep(sleepTime);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    try {
+                        Thread.sleep(sleepTime);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
 
                 send(line);
+                latestSendingTime = System.currentTimeMillis();
                 previousTime = nextTime;
 
             }

@@ -4,7 +4,6 @@ import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
@@ -12,13 +11,11 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.Obje
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.TimerService;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.WindowedStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
-import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
@@ -28,7 +25,6 @@ import org.apache.flink.util.Collector;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.protocol.types.Field;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import utils.Article;
 import utils.Comment;
 import utils.CommentEvent;
 import utils.ranking.Rankable;
@@ -46,6 +42,7 @@ public class Query1 {
 
     private static Properties props;
     private static int topN;
+
 
 
     private static void  initialize() {
@@ -72,31 +69,25 @@ public class Query1 {
 
     public static void main (String args[]) {
 
-        //TODO rifare com 3 partizionei  e parallelism(3) sui Kafka source
         initialize();
 
-
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
         //set event time
-
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-
-
 
         FlinkKafkaConsumer<ObjectNode> kafkaSource = new FlinkKafkaConsumer<>(ConfigurationKafka.TOPIC, new JSONKeyValueDeserializationSchema(true), props);
 
         kafkaSource.assignTimestampsAndWatermarks(new AssignerWithPunctuatedWatermarks<ObjectNode>() {
+            long timestampStreamCompliant=0;
             @Nullable
             @Override
             public Watermark checkAndGetNextWatermark(ObjectNode jsonNodes, long l) {
-                Watermark w = new Watermark(l);
-               // System.out.println(w.toString());
-                return w;
+                return new Watermark(l);
             }
 
             @Override
             public long extractTimestamp(ObjectNode jsonNodes, long l) {
-                long timestampStreamCompliant = 0;
                 long timestamp;
                 try {
                     timestamp = jsonNodes.get("value").get("createDate").asLong();
@@ -104,7 +95,7 @@ public class Query1 {
                     timestampStreamCompliant = timestamp;
 /*                    TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
                     System.out.println("TIMESTAMP COMPLIANT: " +new Date(timestampStreamCompliant).toString());*/
-                } catch (Exception npe){
+                } catch (Exception e){
                     return timestampStreamCompliant; // RETURN PREVIOUS TIMESTAMP COMPLIANT
                 }
 
@@ -114,35 +105,48 @@ public class Query1 {
 
 
                 //tuple2<String, Int> 0.articleId 1.counts
-        DataStream<Tuple2<String, Integer>> comment = env
-                .addSource(kafkaSource).setParallelism(1)
+        DataStream<Tuple2<String, Integer>> commentHour = env
+                .addSource(kafkaSource).setParallelism(NUM_CONSUMERS)
                 .filter(new FindCorruptComment()).setParallelism(3)
                 .map(new SetOneToInstance()).setParallelism(3)
                 .keyBy(0)
                 .timeWindow(Time.hours(1))
+                .sum(1);
+
+
+
+        DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> rankingHour = commentHour
+                .timeWindowAll(Time.hours(1))
+                .process(new Ranking()).setParallelism(1);
+
+        //TODO provare a fare la cosa della classifica intermedia utilizzando come key (cosa?) e le finestre keyd ( non windows all che non ti fa parellizzare)
+
+
+        DataStream<Tuple2<String, Integer>> comment24Hour = commentHour
+                .keyBy(0)
+                .timeWindow(Time.hours(24))
+                .sum(1).setParallelism(3);
+
+        DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> ranking24 = comment24Hour
+                .timeWindowAll(Time.hours(24))
+                .process(new Ranking()).setParallelism(1);
+
+
+
+        DataStream<Tuple2<String, Integer>> comment7Days = comment24Hour
+                .keyBy(0)
+                .timeWindow(Time.days(7))
                 .sum(1).setParallelism(3);
 
 
+        DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> ranking7Days = comment7Days
+                .timeWindowAll(Time.days(7))
+                .process(new Ranking()).setParallelism(1);
 
 
-
-/*
-        DataStream<Tuple2<String, List<Article>>> ranking = comment
-                .timeWindowAll(Time.hours(1))
-                .aggregate(new UpdateRankings()).setParallelism(1)
-                .map(new SetInitialTimestampOfSum());*/
-/*
-        DataStream<Tuple2<String, List<Article>>> ranking = comment
-                .timeWindowAll(Time.hours(1))
-                .aggregate(new UpdateRankings()).setParallelism(1);*/
-
-        DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> ranking = comment
-                .timeWindowAll(Time.hours(1))
-                .process(new MyProcessFunction()).setParallelism(1);
-
-
-
-        ranking.print().setParallelism(1);
+        //rankingHour.print().setParallelism(1);
+         //   ranking24.print().setParallelism(1);
+        ranking7Days.print().setParallelism(1);
     //    ranking.addSink()
 
 
@@ -404,20 +408,57 @@ public class Query1 {
 
 
 
-    private static class MyProcessFunction extends ProcessAllWindowFunction<Tuple2<String, Integer>, Tuple2<String, List<Tuple2<String, Integer>>>, TimeWindow> {
+    private static class Ranking extends ProcessAllWindowFunction<Tuple2<String, Integer>, Tuple2<String, List<Tuple2<String, Integer>>>, TimeWindow> {
         @Override
         public void process(Context context, Iterable<Tuple2<String, Integer>> iterable, Collector<Tuple2<String, List<Tuple2<String, Integer>>>> out) throws Exception {
-            List<Tuple2<String, Integer>> commentsInWindow = StreamSupport
+            List<Tuple2<String, Integer>> ranking = StreamSupport
                     .stream(iterable.spliterator(), false)
                     .sorted((a, b) -> a.f1 > b.f1 ? -1 : a.f1 == b.f1 ? 0 : 1)
                     .limit(topN)
                     .collect(Collectors.toList());
 
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
             String initialTimestamp = new Date(context.window().getStart()).toString();
 
-            out.collect(new Tuple2<>(initialTimestamp, commentsInWindow));
+            out.collect(new Tuple2<>(initialTimestamp, ranking));
 
         }
+    }
+
+    private static class Ranking24 extends ProcessAllWindowFunction<Tuple2<String, List<Tuple2<String, Integer>>>, Tuple2<String,List<Tuple2<String, Integer>>> , TimeWindow> {
+        @Override
+        public void process(Context context, Iterable<Tuple2<String, List<Tuple2<String, Integer>>>> iterable, Collector<Tuple2<String,List<Tuple2<String, Integer>>>> out) throws Exception {
+
+            List<Tuple2<String, List<Tuple2<String, Integer>>>> rankingInWindow = StreamSupport
+                    .stream(iterable.spliterator(), false)
+                    .collect(Collectors.toList());
+
+            Tuple2<String,List<Tuple2<String, Integer>>> ranking24 = new Tuple2<>("", new ArrayList<>());
+
+            for(Tuple2<String,List<Tuple2<String, Integer>>> t : rankingInWindow){
+                ranking24.f1.addAll(t.f1);
+            }
+
+            ranking24.f1.sort((a, b) -> a.f1 > b.f1 ? -1 : a.f1 == b.f1 ? 0 : 1);
+            String initialTimestamp = new Date(context.window().getStart()).toString();
+
+            out.collect(new Tuple2<>(initialTimestamp, getTopN(ranking24.f1,topN)));
+
+        }
+    }
+
+
+
+    public static List<Tuple2<String,Integer>> getTopN(List<Tuple2<String,Integer>> acc,int topN){
+        List<Tuple2<String,Integer>> temp = new ArrayList<>();
+        int numElements = topN;
+        if(acc.size()<topN){
+            numElements=acc.size();
+        }
+        for(int i=0; i<numElements; i++){
+            temp.add(acc.get(i));
+        }
+        return temp;
     }
 
 
