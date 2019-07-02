@@ -24,12 +24,17 @@ public class Comment implements Serializable {
     private String userLocation;
 
 
+    private long count;
+
+
     public Comment() {
     }
 
-    public Comment(String articleId, String createDate) {
-        this.articleId = articleId;
+    public Comment(String createDate,String articleId, long count) {
         this.createDate = createDate;
+        this.articleId = articleId;
+        this.count = count;
+
     }
 
     public Comment(String approveDate, String articleId, String articleWordCount, String commentID,
@@ -95,7 +100,6 @@ public class Comment implements Serializable {
     public void setCommentID(String commentID) {
         this.commentID = commentID;
     }
-
 
     public int getArticleWordCount() {
         return Integer.parseUnsignedInt(articleWordCount);
@@ -189,12 +193,12 @@ public class Comment implements Serializable {
     public String toString() {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         return "Comment{" +
-                "approveDate=" + approveDate.toString() +
+                "approveDate=" + fromUnixTimeToUTC(approveDate).toString() +
                 ", articleId='" + articleId + '\'' +
                 ", articleWordCount=" + articleWordCount +
                 ", commentID=" + commentID +
                 ", commentType='" + commentType + '\'' +
-                ", createDate=" + createDate.toString() +
+                ", createDate=" + fromUnixTimeToUTC(createDate).toString() +
                 ", depth=" + depth +
                 ", editorsSelection=" + editorsSelection +
                 ", inReplyTo=" + inReplyTo +
