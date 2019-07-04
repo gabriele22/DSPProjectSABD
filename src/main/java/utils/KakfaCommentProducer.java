@@ -1,23 +1,19 @@
 package utils;
-
-
 import config.ConfigurationKafka;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
-
+import utils.entity.Comment;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
+
 public class KakfaCommentProducer {
-
-
 
     private String topic;
 
     private Producer<String, Comment> producer;
 
     public KakfaCommentProducer(String topic) {
-
         this.topic = topic;
         producer = createProducer();
 
@@ -27,7 +23,6 @@ public class KakfaCommentProducer {
 
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, ConfigurationKafka.BOOTSTRAP_SERVERS);
-
         props.put(ProducerConfig.CLIENT_ID_CONFIG, ConfigurationKafka.PRODUCER_ID);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -36,8 +31,6 @@ public class KakfaCommentProducer {
     }
 
     public void produce(String key, Comment comment) {
-
-
         try {
 
             final ProducerRecord<String, Comment> record = new ProducerRecord<>(topic, key, comment);

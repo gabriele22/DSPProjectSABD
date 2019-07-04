@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.*;
 
 import config.ConfigurationKafka;
-import utils.Comment;
+import utils.entity.Comment;
 import utils.KakfaCommentProducer;
 
 /**
@@ -28,22 +28,19 @@ public class Generator implements Runnable{
         BufferedReader br = null;
 
         try {
-            System.out.println("Initializing... ");
             br = new BufferedReader(new FileReader(filename));
             String header = br.readLine();
             System.out.println("HEADER: "+ header);
 
             String line = br.readLine();
             long previousTime = getDateTime(line);
-            long latestSendingTime = System.currentTimeMillis();
             send(line);
 
             while ((line = br.readLine()) != null) {
 
                 long nextTime = getDateTime(line);
                 long sleepTime = (int) Math.floor(((double) (nextTime - previousTime ) / (60*1000)));
-/*                long deltaIntervalToSkip = 1000 - (System.currentTimeMillis() - latestSendingTime);
-                sleepTime = sleepTime+deltaIntervalToSkip;*/
+
                 if(sleepTime>0) {
 
                     System.out.println(" sleep for :" + sleepTime + " ms");
@@ -56,7 +53,6 @@ public class Generator implements Runnable{
                 }
 
                 send(line);
-                latestSendingTime = System.currentTimeMillis();
                 previousTime = nextTime;
 
             }
@@ -75,11 +71,12 @@ public class Generator implements Runnable{
     }
 
 
+    //send with kafkaCommentProducer
     private void send(String line) {
         KakfaCommentProducer producer = new KakfaCommentProducer(ConfigurationKafka.TOPIC);
 
         try {
-            String[] tokensUnchecked = line.split(",");
+            String[] tokensUnchecked = line.split(",",-1);
             String[] tokens = controlFieldWithString(tokensUnchecked);
 
             Comment comment = new Comment(tokens[0], tokens[1], tokens[2], tokens[3],
@@ -102,7 +99,7 @@ public class Generator implements Runnable{
 
     //get createDate present in dataset
     private long getDateTime(String line){
-        String[] tokens	=	line.split(",");
+        String[] tokens	=	line.split(",",-1);
         long ts = Long.valueOf(tokens[5])*1000;
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         Date d= new Date(ts);

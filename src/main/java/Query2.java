@@ -1,273 +1,136 @@
 import config.ConfigurationKafka;
-import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.state.ValueState;
-import org.apache.flink.api.common.state.ValueStateDescriptor;
-import org.apache.flink.api.java.tuple.Tuple;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks;
-import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
-import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
-import org.apache.flink.streaming.api.watermark.Watermark;
+import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
-import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
-import org.apache.flink.streaming.util.serialization.JSONKeyValueDeserializationSchema;
+import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.flink.util.Collector;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import scala.Int;
-import utils.Comment;
+import utils.GetterFlinkKafkaProducer;
 
-import javax.annotation.Nullable;
-import java.util.Date;
-import java.util.List;
-import java.util.Properties;
-import java.util.TimeZone;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
+/**
+ * This class provides the total number of comments that are entered in two hours.
+ * The number of comments is aggregated over three time windows: 24 hours, 7 days, 1 month
+ */
 
 public class Query2 {
 
     private static final int NUM_CONSUMERS = 3;
 
     private static Properties props;
-    private static int topN;
 
 
 
-    private static void  initialize() {
-        //set kafka properties
-        props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
-                ConfigurationKafka.BOOTSTRAP_SERVERS);
+    public static void startQuery2( DataStream<ObjectNode> commentCompliant){
 
-        props.setProperty("zookeeper.connect",
-                ConfigurationKafka.ZOOKEEPER);
-
-        props.put(ConsumerConfig.GROUP_ID_CONFIG,
-                ConfigurationKafka.CONSUMER_GROUP_ID);
-
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                StringDeserializer.class.getName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                StringDeserializer.class.getName());
-
-        topN =3;
-
-
-    }
-
-
-
-    public static void main(String[] args){
-        initialize();
-
-        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-
-        //set event time
-        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-
-        FlinkKafkaConsumer<ObjectNode> kafkaSource = new FlinkKafkaConsumer<>(ConfigurationKafka.TOPIC, new JSONKeyValueDeserializationSchema(true), props);
-
-        kafkaSource.assignTimestampsAndWatermarks(new AssignerWithPunctuatedWatermarks<ObjectNode>() {
-            long timestampStreamCompliant=0;
-            @Nullable
-            @Override
-            public Watermark checkAndGetNextWatermark(ObjectNode jsonNodes, long l) {
-                return new Watermark(l);
-            }
-
-            @Override
-            public long extractTimestamp(ObjectNode jsonNodes, long l) {
-                long timestamp;
-                try {
-                    timestamp = jsonNodes.get("value").get("createDate").asLong();
-
-                    timestampStreamCompliant = timestamp;
-/*                    TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
-                    System.out.println("TIMESTAMP COMPLIANT: " +new Date(timestampStreamCompliant).toString());*/
-                } catch (Exception e){
-                    return timestampStreamCompliant; // RETURN PREVIOUS TIMESTAMP COMPLIANT
-                }
-
-                return timestampStreamCompliant;
-            }
-        });
-
-
-
-        DataStream<Tuple2<String,Integer>> numCommentOnTwoHour = env
-                .addSource(kafkaSource).setParallelism(NUM_CONSUMERS)
-                .filter(new FindCorruptComment()).setParallelism(3)
-                .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(3)
-                .map(new GetCommentDepth())
-/*
-                .map(new SetKeyAndDepth()).setParallelism(3)
-
+        //count number of DIRECT comments in two hours
+        DataStream<Tuple2<String,Integer>> numCommentOnTwoHour = commentCompliant
+                .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(2)
+                .map(new SetterKeyAndOne()).setParallelism(2)
                 .keyBy(0)
-                .timeWindow(Time.hours(2))
-                .sum(1).setParallelism(3)
-                .map(x-> x.f1);
-*/
-
-                .timeWindowAll(Time.hours(2))
-                .process(new CountDirectCommentAndAssignStart());
-
-        SingleOutputStreamOperator<Tuple2<String, List<Tuple2<String,Integer>>>> numComments24Hours = numCommentOnTwoHour
-                .timeWindowAll(Time.hours(24))
-                .process(new PrintAllHour());
-
-        SingleOutputStreamOperator<Tuple2<String, List<Tuple2<String,Integer>>>> numComments7Days = numCommentOnTwoHour
-                .timeWindowAll(Time.days(7))
-                .process(new PrintAllHour());
+                .window(TumblingEventTimeWindows.of(Time.hours(2)))
+                .sum(1).setParallelism(2);
 
 
+        //get ordered result of  24 hour window
+        DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments24Hours = numCommentOnTwoHour
+                .windowAll(TumblingEventTimeWindows.of(Time.hours(24)))
+                .process(new SorterResults());
 
-        numComments7Days.print();
-        try {
-            env.execute("Query 2");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        //count comments on two hours for 7 days and get ordered result
+        DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments7Days= numCommentOnTwoHour
+                .keyBy(0)
+                .window(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
+                .sum(1).setParallelism(2)
+                .windowAll(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
+                .process(new SorterResults());
+
+
+        //count comments on two hours for month and get ordered result
+        DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numCommentsMonth= numCommentOnTwoHour
+                .keyBy(0)
+                .window(SlidingEventTimeWindows.of(Time.days(30),Time.days(7)))
+                .sum(1).setParallelism(2)
+                .timeWindowAll(Time.milliseconds(1))
+                .process(new SorterResults());
+
+
+        //send results as String on Kafka
+        FlinkKafkaProducer<String> myProducer24 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_24_HOUR_);
+        FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_7_DAYS_);
+        FlinkKafkaProducer<String> myProducer30 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_30_DAYS_);
+
+        numComments24Hours.map(new CreateString()).addSink(myProducer24);
+        numComments7Days.map(new CreateString()).addSink(myProducer7);
+        numCommentsMonth.map(new CreateString()).addSink(myProducer30);
+
+
 
     }
 
 
-
-    private static class FindCorruptComment implements FilterFunction<ObjectNode> {
-        @Override
-        public boolean filter(ObjectNode jsonNodes) throws Exception {
-            Comment comment = null;
-            //if all field of comment is not present it means that comment is corrupt
-            try {
-                comment = new Comment(jsonNodes.get("value").get("approveDate").asText(), jsonNodes.get("value").get("articleId").asText(),
-                        jsonNodes.get("value").get("articleWordCount").asText(), jsonNodes.get("value").get("commentID").asText(), jsonNodes.get("value").get("commentType").asText(),
-                        jsonNodes.get("value").get("createDate").asText(), jsonNodes.get("value").get("depth").asText(),
-                        jsonNodes.get("value").get("editorsSelection").asText(), jsonNodes.get("value").get("inReplyTo").asText(),
-                        jsonNodes.get("value").get("parentUserDisplayName").asText(), jsonNodes.get("value").get("recommendations").asText(),
-                        jsonNodes.get("value").get("sectionName").asText(), jsonNodes.get("value").get("userDisplayName").asText(),
-                        jsonNodes.get("value").get("userID").asText(), jsonNodes.get("value").get("userLocation").asText());
-            } catch (Exception e) {
-                return false;
-            }
-
-            //getter of Comment class cast string value in specific type or class
-            //if at least one exception is launch, it means that comment is corrupt
-            try {
-                comment.getApproveDate();
-                comment.getArticleId();
-                comment.getArticleWordCount();
-                comment.getCommentID();
-                comment.getCommentType();
-                comment.getCreateDate();
-                comment.getDepth();
-                comment.getEditorsSelection();
-                comment.getInReplyTo();
-                comment.getParentUserDisplayName();
-                comment.getRecommendations();
-                comment.getSectionName();
-                comment.getUserDisplayName();
-                comment.getUserID();
-                comment.getUserLocation();
-            } catch (Exception e) {
-                return false;
-            }
-
-            return true;
-        }
-    }
-
-
-    private static class GetCommentDepth implements MapFunction<ObjectNode, Integer> {
-        @Override
-        public Integer map(ObjectNode jsonNodes) throws Exception {
-            String articleId = jsonNodes.get("value").get("articleId").asText();
-            int depth = jsonNodes.get("value").get("depth").asInt();
-            return depth;
-        }
-    }
-
-/*    private static class SetKeyAndDepth implements MapFunction<ObjectNode, Tuple2<String,Integer>> {
+    //set the key based on the value createDate and one for the next operation
+    private static class SetterKeyAndOne implements MapFunction<ObjectNode, Tuple2<String,Integer>> {
         @Override
         public Tuple2<String,Integer> map(ObjectNode jsonNodes) throws Exception {
 
-            int depth = jsonNodes.get("value").get("depth").asInt();
-            return new Tuple2<>("ok",depth);
-        }
-    }*/
+            long createDate = jsonNodes.get("value").get("createDate").asLong();
+            LocalDateTime localDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(createDate), ZoneOffset.UTC.normalized());
+            int h = localDateTime.getHour();
+            String hourKey;
 
-/*
-    private static class CountOnTwoHour extends ProcessWindowFunction<Tuple2<Integer, Integer>, R, Tuple, TimeWindow> {
-        @Override
-        public void process(Tuple tuple, Context context, Iterable<Tuple2<Integer, Integer>> iterable, Collector<R> collector) throws Exception {
-
-        }
-    }*/
-
-    private static class CountDirectCommentAndAssignStart extends ProcessAllWindowFunction<Integer, Tuple2<String,Integer>, TimeWindow> {
-        @Override
-        public void process(Context context, Iterable<Integer> iterable, Collector<Tuple2<String,Integer>> out) throws Exception {
-
-            List<Integer> list = StreamSupport
-                    .stream(iterable.spliterator(),false)
-                    .collect(Collectors.toList());
-            int count=0;
-            for(Integer i: list){
-                count = count +i;
+            if(h%2==0) {
+                if (h <= 9) hourKey = "0" + h + ":00:00";
+                else hourKey = h + ":00:00";
+            }else {
+                if (h <= 9) hourKey = "0" + (h - 1) + ":00:00";
+                else hourKey = (h - 1) + ":00:00";
             }
-            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
-            String initialTimestamp = new Date(context.window().getStart()).toString();
 
-            out.collect(new Tuple2<>(initialTimestamp,count));
-
-
-
+            return new Tuple2<>(hourKey,1);
         }
     }
 
-    private static class PrintAllHour extends ProcessAllWindowFunction<Tuple2<String, Integer>, Tuple2<String, List<Tuple2<String,Integer>>>, TimeWindow> {
+    //sort hours list and add initial timestamp of window
+    private static class SorterResults extends ProcessAllWindowFunction<Tuple2<String,Integer>, Tuple2<String, List<Tuple2<String,Integer>>>, TimeWindow> {
         @Override
-        public void process(Context context, Iterable<Tuple2<String, Integer>> iterable, Collector<Tuple2<String, List<Tuple2<String,Integer>>>> out) throws Exception {
-            List<Tuple2<String,Integer>> list = StreamSupport
-                    .stream(iterable.spliterator(),false)
-                    .collect(Collectors.toList());
-
-            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
-            String initialTimestamp = new Date(context.window().getStart()).toString();
-
-            out.collect(new Tuple2<>(initialTimestamp, list));
-
-        }
-    }
-
-/*    private static class PrintAllHour extends ProcessAllWindowFunction< Integer, Tuple2<String, List<Integer>>, TimeWindow> {
-        @Override
-        public void process(Context context, Iterable<Integer> iterable, Collector<Tuple2<String, List<Integer>>> out) throws Exception {
-            List<Integer> list = StreamSupport
-                    .stream(iterable.spliterator(),false)
+        public void process(Context context, Iterable<Tuple2<String,Integer>> iterable, Collector<Tuple2<String, List<Tuple2<String,Integer>>>> out) throws Exception {
+            List<Tuple2<String,Integer>> countList = StreamSupport
+                    .stream(iterable.spliterator(), false)
+                    .sorted(Comparator.comparing(x -> x.f0))
                     .collect(Collectors.toList());
 
             String initialTimestamp = new Date(context.window().getStart()).toString();
 
-            out.collect(new Tuple2<>(initialTimestamp, list));
+            out.collect(new Tuple2<>(initialTimestamp, countList));
 
         }
-    }*/
+    }
 
-    private static class getArticleIdAndDepth implements MapFunction<ObjectNode, Tuple2<String,Integer>> {
+
+    private static class CreateString implements MapFunction<Tuple2<String, List<Tuple2<String, Integer>>>, String> {
         @Override
-        public Tuple2<String,Integer> map(ObjectNode jsonNodes) throws Exception {
-            String articleId = jsonNodes.get("value").get("articleId").asText();
-            int depth = jsonNodes.get("value").get("depth").asInt();
-            return new Tuple2<>(articleId,depth);
+        public String map(Tuple2<String, List<Tuple2<String, Integer>>> stringListTuple2) throws Exception {
+
+            StringBuilder print = new StringBuilder();
+            print.append(stringListTuple2.f0.toString());
+            print.append(" --> ");
+            for(Tuple2<String, Integer> tuple: stringListTuple2.f1){
+                print.append("{").append(tuple.f0).append(", count = ").append(tuple.f1).append("} ");
+            }
+
+            return print.toString();
         }
     }
 }
