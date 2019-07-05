@@ -1,6 +1,6 @@
 # DSP-Project-SABD
 
-The goal of this project is to answer the first two queries in the document: <https://drive.google.com/file/d/1j3Ijo4YhdxRY27KdteIQUeAaZwIJAfAo/view?usp=sharing>.
+The goal of this project is to answer the first two queries in the document: <https://drive.google.com/file/d/1mVxpYWk_OQdDZBCSqUck_pTQ8WwbEC21/view?usp=sharing>.
 Furthermore it is possible to create a standalone cluster with docker and docker-compose to test everything.
 
 ## Pre requisites
