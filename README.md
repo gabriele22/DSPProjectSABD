@@ -20,11 +20,12 @@ sh launchEnvironment.sh  yourPathFileDataset
 ```
 
 ## Usage
-Execute this command to start the **Generator** and **Flink Job**: 
 * The **Generator** will replicate the data on a kafka topic
   * between sending a comment and the next one will wait a number of milliseconds equal to the number of minutes between the creation date of the two comments
 * **Flink Job** will read the data from the topic kafka and execute the two queries by publishing the results on other kafka topics 
   * one topic for each window of each query (six topics)
+  
+Execute this command to start the **Generator** and **Flink Job**: 
 ```bash
 sh startGeneratorAndFlinkJob.sh
 ```
