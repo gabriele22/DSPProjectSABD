@@ -24,7 +24,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>core.Starter</mainClass>
+                            <mainClass>core.Generator</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
