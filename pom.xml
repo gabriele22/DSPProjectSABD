@@ -24,7 +24,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>ex.SocketWindowWordCount</mainClass>
+                            <mainClass>core.Starter</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -49,6 +49,7 @@
 
         </plugins>
     </build>
+
 
 
     <dependencies>

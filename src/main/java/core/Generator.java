@@ -1,8 +1,9 @@
+package core;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
-
 import config.ConfigurationKafka;
 import utils.entity.Comment;
 import utils.KakfaCommentProducer;

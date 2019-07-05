@@ -14,7 +14,6 @@ public class ConfigurationKafka {
                     KAFKA_BROKER_1 + SEP +
                     KAFKA_BROKER_2;
 
-    //GENERATOR
     public static final String PRODUCER_ID = "producer";
     public static final String TOPIC = "comments";
     public final static String CONSUMER_GROUP_ID = "consumer";
@@ -23,7 +22,6 @@ public class ConfigurationKafka {
     public static final String TOPIC_QUERY_ONE_HOUR_ = "query1-one-hour-rank";
     public static final String TOPIC_QUERY_ONE_24_HOURS_ = "query1-24-hours-rank";
     public static final String TOPIC_QUERY_ONE_7_DAYS_ =  "query1-7-days-rank";
-
 
     public static final String TOPIC_QUERY_TWO_24_HOUR_ = "query2-24-hours";
     public static final String TOPIC_QUERY_TWO_7_DAYS_ = "query2-7-days";

@@ -26,7 +26,7 @@ public class GetterEventTImeAndWatermark implements AssignerWithPunctuatedWaterm
             timestamp = jsonNodes.get("value").get("createDate").asLong();
             timestampStreamCompliant = timestamp;
         } catch (Exception e){
-            return timestampStreamCompliant; // RETURN TO PREVIOUS TIMESTAMP COMPLIANT
+            return timestampStreamCompliant; // RETURN PREVIOUS TIMESTAMP COMPLIANT
         }
 
         return timestampStreamCompliant;

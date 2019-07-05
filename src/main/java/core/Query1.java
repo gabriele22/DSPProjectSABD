@@ -1,3 +1,5 @@
+package core;
+
 import config.ConfigurationKafka;
 import org.apache.flink.api.common.functions.*;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
@@ -57,7 +59,7 @@ public class Query1 {
 
         //get ranking in one hour
         DataStream<Tuple2<Date, List<Tuple2<String, Integer>>>> rankingHour = commentHour
-                .keyBy(0)
+                //.keyBy(0)
                 .windowAll(TumblingEventTimeWindows.of(Time.hours(1)))
                 .process(new Ranking()).setParallelism(1);
 
@@ -83,7 +85,7 @@ public class Query1 {
 
         rankingHour
                 .map(new CreateString())
-                .addSink(myProducerHour);
+                .addSink(myProducerHour).setParallelism(1);
 
         ranking24
                 .map(new CreateString())

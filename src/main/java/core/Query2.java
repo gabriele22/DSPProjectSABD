@@ -1,3 +1,5 @@
+package core;
+
 import config.ConfigurationKafka;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -46,7 +48,7 @@ public class Query2 {
         //get ordered result of  24 hour window
         DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments24Hours = numCommentOnTwoHour
                 .windowAll(TumblingEventTimeWindows.of(Time.hours(24)))
-                .process(new SorterResults());
+                .process(new SortResultsAndTakeInitialWindowTime());
 
         //count comments on two hours for 7 days and get ordered result
         DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments7Days= numCommentOnTwoHour
@@ -54,16 +56,17 @@ public class Query2 {
                 .window(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
                 .sum(1).setParallelism(2)
                 .windowAll(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
-                .process(new SorterResults());
+                .process(new SortResultsAndTakeInitialWindowTime());
 
 
         //count comments on two hours for month and get ordered result
         DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numCommentsMonth= numCommentOnTwoHour
                 .keyBy(0)
-                .window(SlidingEventTimeWindows.of(Time.days(30),Time.days(7)))
+                .window(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
                 .sum(1).setParallelism(2)
-                .timeWindowAll(Time.milliseconds(1))
-                .process(new SorterResults());
+                .windowAll(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
+                .process(new SortResultsAndTakeInitialWindowTime());
+
 
 
         //send results as String on Kafka
@@ -103,7 +106,7 @@ public class Query2 {
     }
 
     //sort hours list and add initial timestamp of window
-    private static class SorterResults extends ProcessAllWindowFunction<Tuple2<String,Integer>, Tuple2<String, List<Tuple2<String,Integer>>>, TimeWindow> {
+    private static class SortResultsAndTakeInitialWindowTime extends ProcessAllWindowFunction<Tuple2<String,Integer>, Tuple2<String, List<Tuple2<String,Integer>>>, TimeWindow> {
         @Override
         public void process(Context context, Iterable<Tuple2<String,Integer>> iterable, Collector<Tuple2<String, List<Tuple2<String,Integer>>>> out) throws Exception {
             List<Tuple2<String,Integer>> countList = StreamSupport
