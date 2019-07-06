@@ -18,6 +18,12 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import org.apache.flink.api.common.serialization.SimpleStringEncoder;
+import org.apache.flink.core.fs.Path;
+import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
+
+import static org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy.build;
+
 /**
  * This class provides the ranking of the 3 articles that received the most comments
  * on three different time windows: 1 hour, 24 hours, 7 days
@@ -83,7 +89,8 @@ public class Query1 {
         FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_ONE_7_DAYS_);
 
 
-        rankingHour
+        /*Send results on KAFKA (real-time)*/
+/*        rankingHour
                 .map(new CreateString())
                 .addSink(myProducerHour).setParallelism(1);
 
@@ -93,7 +100,23 @@ public class Query1 {
 
         ranking7Days
                 .map(new CreateString())
-                .addSink(myProducer7);
+                .addSink(myProducer7);*/
+
+
+
+        /*write results on FILE*/
+        rankingHour
+                .map(new CreateString())
+                .writeAsText("./results/query1-one-hour-rank").setParallelism(1);
+
+        ranking24
+                .map(new CreateString())
+                .writeAsText("./results/query1-24-hours-rank").setParallelism(1);
+        ranking7Days
+                .map(new CreateString())
+                .writeAsText("./results/query1-7-days-rank").setParallelism(1);
+
+
 
 
     }

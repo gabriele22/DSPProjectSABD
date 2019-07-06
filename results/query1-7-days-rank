@@ -1,0 +1,15 @@
+Mon Jan 01 00:00:00 UTC 2018 --> {id = 5a4e76657c459f29e79b21da, n.comm = 2296} {id = 5a4ea68b7c459f29e79b258b, n.comm = 1644} {id = 5a4fc38a7c459f29e79b2800, n.comm = 1548} 
+Mon Jan 08 00:00:00 UTC 2018 --> {id = 5a538abf7c459f29e79b2d48, n.comm = 1821} {id = 5a58af9f7c459f29e79b3a29, n.comm = 1577} {id = 5a52cfb37c459f29e79b2bd9, n.comm = 1485} 
+Mon Jan 15 00:00:00 UTC 2018 --> {id = 5a63696010f40f00018bd091, n.comm = 1700} {id = 5a5c069c7c459f29e79b3f4f, n.comm = 1535} {id = 5a5b8cb67c459f29e79b3e9c, n.comm = 1503} 
+Mon Jan 22 00:00:00 UTC 2018 --> {id = 5a6a810e10f40f00018bdcaa, n.comm = 1816} {id = 5a69aac110f40f00018bda04, n.comm = 1674} {id = 5a6a18a310f40f00018bdb72, n.comm = 1481} 
+Mon Jan 29 00:00:00 UTC 2018 --> {id = 5a7335a210f40f00018befb3, n.comm = 1615} {id = 5a74572210f40f00018bf2c8, n.comm = 1479} {id = 5a73a8f210f40f00018bf146, n.comm = 1382} 
+Mon Feb 05 00:00:00 UTC 2018 --> {id = 5a78699a10f40f00018bf902, n.comm = 1574} {id = 5a7df695068401528a290447, n.comm = 1335} {id = 5a77b80f10f40f00018bf791, n.comm = 1228} 
+Mon Feb 12 00:00:00 UTC 2018 --> {id = 5a8720c810f40f00018c176e, n.comm = 1773} {id = 5a86396710f40f00018c14f8, n.comm = 1544} {id = 5a87176810f40f00018c174e, n.comm = 1502} 
+Mon Feb 19 00:00:00 UTC 2018 --> {id = 5a8de57210f40f00018c245d, n.comm = 1587} {id = 5a8a0a5110f40f00018c1b84, n.comm = 1521} {id = 5a8db18010f40f00018c23bb, n.comm = 1440} 
+Mon Feb 26 00:00:00 UTC 2018 --> {id = 5a944d5210f40f00018c31ed, n.comm = 1402} {id = 5a95ceb810f40f00018c35ce, n.comm = 1255} {id = 5a95bfb810f40f00018c35a3, n.comm = 1116} 
+Mon Mar 05 00:00:00 UTC 2018 --> {id = 5a90494210f40f00018c2afb, n.comm = 70} {id = 5a8e94b810f40f00018c25ec, n.comm = 58} {id = 5a8fe63410f40f00018c2971, n.comm = 42} 
+Mon Mar 12 00:00:00 UTC 2018 --> {id = 5a8bd63e10f40f00018c1ea9, n.comm = 26} {id = 5a85e60910f40f00018c140f, n.comm = 8} {id = 5a7adc3810f40f00018bff64, n.comm = 8} 
+Mon Mar 19 00:00:00 UTC 2018 --> {id = 5a8fe63410f40f00018c2971, n.comm = 31} {id = 5a7adc3810f40f00018bff64, n.comm = 9} {id = 5a8416b910f40f00018c0e9b, n.comm = 8} 
+Mon Mar 26 00:00:00 UTC 2018 --> {id = 5a8fe63410f40f00018c2971, n.comm = 54} {id = 5a8c461110f40f00018c1ffe, n.comm = 8} {id = 5a7adc3810f40f00018bff64, n.comm = 8} 
+Mon Apr 02 00:00:00 UTC 2018 --> {id = 5a7adc3810f40f00018bff64, n.comm = 21} {id = 5a8fe63410f40f00018c2971, n.comm = 14} {id = 5a90494210f40f00018c2afb, n.comm = 9} 
+Mon Apr 09 00:00:00 UTC 2018 --> {id = 5a90494210f40f00018c2afb, n.comm = 16} {id = 5a8c461110f40f00018c1ffe, n.comm = 9} {id = 5a8fe63410f40f00018c2971, n.comm = 8} 

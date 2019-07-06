@@ -16,14 +16,14 @@ You need to download dataset file:
 First download and unzip the file: <https://drive.google.com/file/d/1LfUSs_qrdwZ6MCySFLrciwRBKwBt2wrw/view?usp=sharing>
 In the directory created, open a terminal and execute this command:
 ```bash
-sh launchEnvironment.sh  yourPathFileDataset
+sh launchEnvironment.sh  /yourPathFileDataset/..
 ```
 
 ## Usage
 * The **Generator** will replicate the data on a kafka topic
   * between sending a comment and the next one will wait a number of milliseconds equal to the number of minutes between the creation date of the two comments
 * **Flink Job** will read the data from the topic kafka and execute the two queries by publishing the results on other kafka topics 
-  * one topic for each window of each query (six topics)
+  * one topic for each window of each query (*six* topics)
   
 Execute this command to start the **Generator** and **Flink Job**: 
 ```bash

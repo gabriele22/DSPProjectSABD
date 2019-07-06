@@ -2,9 +2,12 @@ package core;
 
 import config.ConfigurationKafka;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringEncoder;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
@@ -74,10 +77,21 @@ public class Query2 {
         FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_7_DAYS_);
         FlinkKafkaProducer<String> myProducer30 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_30_DAYS_);
 
+        /*Send results on KAFKA (real-time)*/
+/*
         numComments24Hours.map(new CreateString()).addSink(myProducer24);
         numComments7Days.map(new CreateString()).addSink(myProducer7);
         numCommentsMonth.map(new CreateString()).addSink(myProducer30);
+*/
 
+
+        /*write results on FILE*/
+        numComments24Hours
+                .map(new CreateString()).writeAsText("./results/query2-24-hours").setParallelism(1);
+        numComments7Days
+                .map(new CreateString()).writeAsText("./results/query2-7-days").setParallelism(1);
+        numCommentsMonth
+                .map(new CreateString()).writeAsText("./results/query2-30-days").setParallelism(1);
 
 
     }
