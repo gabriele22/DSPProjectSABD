@@ -10,7 +10,7 @@ import utils.entity.Comment;
 public class FindCorruptComment implements FilterFunction<ObjectNode> {
     @Override
     public boolean filter(ObjectNode jsonNodes) throws Exception {
-        Comment comment = null;
+        Comment comment;
         //if all field of comment is not present it means that comment is corrupt
         try {
             comment = new Comment(jsonNodes.get("value").get("approveDate").asText(), jsonNodes.get("value").get("articleId").asText(),

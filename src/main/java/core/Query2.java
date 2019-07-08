@@ -2,21 +2,17 @@ package core;
 
 import config.ConfigurationKafka;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.serialization.SimpleStringEncoder;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.core.fs.Path;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.flink.util.Collector;
 import utils.GetterFlinkKafkaProducer;
-
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -31,21 +27,30 @@ import java.util.stream.StreamSupport;
 
 public class Query2 {
 
-    private static final int NUM_CONSUMERS = 3;
-
-    private static Properties props;
 
 
+    public static void startQuery2( DataStream<ObjectNode> commentCompliant, boolean latency){
 
-    public static void startQuery2( DataStream<ObjectNode> commentCompliant){
+        //if latency required, this part replicate transformation before tuples enter in a timing window
+        if(latency){
+            commentCompliant
+                    .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(3)
+                    .map(new LatencyGetterMilliSec()).setParallelism(3)
+                    .countWindowAll(500)
+                    .sum(2)
+                    .map(new LatencyPrinter());
+        }
+
+        //map 0.hour 1.numCommentsOnTwoHours
+        DataStream<Tuple2<String,Integer>> coupleHourOne = commentCompliant
+                .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(3)
+                .map(new SetterKeyAndOne()).setParallelism(3);
 
         //count number of DIRECT comments in two hours
-        DataStream<Tuple2<String,Integer>> numCommentOnTwoHour = commentCompliant
-                .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(2)
-                .map(new SetterKeyAndOne()).setParallelism(2)
+        DataStream<Tuple2<String,Integer>> numCommentOnTwoHour= coupleHourOne
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.hours(2)))
-                .sum(1).setParallelism(2);
+                .sum(1).setParallelism(3);
 
 
         //get ordered result of  24 hour window
@@ -57,7 +62,7 @@ public class Query2 {
         DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments7Days= numCommentOnTwoHour
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
-                .sum(1).setParallelism(2)
+                .sum(1).setParallelism(3)
                 .windowAll(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
                 .process(new SortResultsAndTakeInitialWindowTime());
 
@@ -66,32 +71,34 @@ public class Query2 {
         DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numCommentsMonth= numCommentOnTwoHour
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
-                .sum(1).setParallelism(2)
+                .sum(1).setParallelism(3)
                 .windowAll(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
                 .process(new SortResultsAndTakeInitialWindowTime());
 
 
 
-        //send results as String on Kafka
+        //kafka producers
         FlinkKafkaProducer<String> myProducer24 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_24_HOUR_);
         FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_7_DAYS_);
         FlinkKafkaProducer<String> myProducer30 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_30_DAYS_);
 
         /*Send results on KAFKA (real-time)*/
-/*
-        numComments24Hours.map(new CreateString()).addSink(myProducer24);
-        numComments7Days.map(new CreateString()).addSink(myProducer7);
-        numCommentsMonth.map(new CreateString()).addSink(myProducer30);
-*/
+        numComments24Hours
+                .map(new CreateString()).setParallelism(3)
+                .addSink(myProducer24).setParallelism(1);
+        numComments7Days.map(new CreateString()).setParallelism(3)
+                .addSink(myProducer7).setParallelism(1);
+        numCommentsMonth.map(new CreateString()).setParallelism(3)
+                .addSink(myProducer30).setParallelism(1);
 
 
         /*write results on FILE*/
-        numComments24Hours
+/*        numComments24Hours
                 .map(new CreateString()).writeAsText("./results/query2-24-hours").setParallelism(1);
         numComments7Days
                 .map(new CreateString()).writeAsText("./results/query2-7-days").setParallelism(1);
         numCommentsMonth
-                .map(new CreateString()).writeAsText("./results/query2-30-days").setParallelism(1);
+                .map(new CreateString()).writeAsText("./results/query2-30-days").setParallelism(1);*/
 
 
     }
@@ -150,6 +157,42 @@ public class Query2 {
             return print.toString();
         }
     }
+
+
+    //get latency for each tuple (milliseconds)
+    private static class LatencyGetterMilliSec implements MapFunction<ObjectNode, Tuple3<String,Integer,Long>> {
+        @Override
+        public Tuple3<String,Integer,Long> map(ObjectNode jsonNodes) throws Exception {
+            long createDate = jsonNodes.get("value").get("createDate").asLong();
+            LocalDateTime localDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(createDate), ZoneOffset.UTC.normalized());
+            int h = localDateTime.getHour();
+            String hourKey;
+
+            if(h%2==0) {
+                if (h <= 9) hourKey = "0" + h + ":00:00";
+                else hourKey = h + ":00:00";
+            }else {
+                if (h <= 9) hourKey = "0" + (h - 1) + ":00:00";
+                else hourKey = (h - 1) + ":00:00";
+            }
+            long entryTime = jsonNodes.get("entryTimeTuple").asLong();
+
+
+
+            return new Tuple3<>(hourKey,1,System.nanoTime()-entryTime);
+        }
+    }
+
+    //print mean of 500 tuple
+    private static class LatencyPrinter implements MapFunction<Tuple3<String,Integer,Long>, Void> {
+        @Override
+        public Void map(Tuple3<String,Integer,Long> latencyOf100Tuples) throws Exception {
+
+            System.out.format("LATENCY QUERY2: %d %n",latencyOf100Tuples.f2/500);
+            return null;
+        }
+    }
+
 }
 
 

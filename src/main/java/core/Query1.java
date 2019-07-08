@@ -2,8 +2,8 @@ package core;
 
 import config.ConfigurationKafka;
 import org.apache.flink.api.common.functions.*;
-import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
@@ -17,13 +17,6 @@ import utils.GetterFlinkKafkaProducer;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-
-import org.apache.flink.api.common.serialization.SimpleStringEncoder;
-import org.apache.flink.core.fs.Path;
-import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
-
-import static org.apache.flink.streaming.api.functions.sink.filesystem.rollingpolicies.OnCheckpointRollingPolicy.build;
-
 /**
  * This class provides the ranking of the 3 articles that received the most comments
  * on three different time windows: 1 hour, 24 hours, 7 days
@@ -31,36 +24,49 @@ import static org.apache.flink.streaming.api.functions.sink.filesystem.rollingpo
 
 public class Query1 {
 
-    private static final int NUM_CONSUMERS = 3;
 
-    private static Properties props;
     private static final  int topN=3;
 
 
-    public static void startQuery1( DataStream<ObjectNode> commentCompliant){
+    public Query1() {
+    }
+
+    public  static void startQuery1(DataStream<ObjectNode> commentCompliant, boolean latency){
+
+        //if latency required, this part replicate transformation before tuples enter in a timing window
+        if(latency){
+            commentCompliant
+                    .map(new LatencyGetterMilliSec()).setParallelism(3)
+                    .countWindowAll(500)
+                    .sum(2)
+                    .map(new LatencyPrinter());
+        }
+
 
         //counts comments arrived in one hour for each article
-        //(use world-count idea)
-        DataStream<Tuple2<String, Integer>> commentHour = commentCompliant
-                .map(new OneSetter()).setParallelism(2)
-                //value 0.articleId 1.counts
+        //map  0.articleId 1.counts
+        DataStream<Tuple2<String, Integer>> cupleArticleIdOne = commentCompliant
+                    .map(new OneSetter()).setParallelism(3);
+
+
+
+        DataStream<Tuple2<String, Integer>>commentHour = cupleArticleIdOne
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.hours(1)))
-                .sum(1).setParallelism(2);
-
+                .sum(1).setParallelism(3);
         //counts comments arrived in 24 hours for each article
         //(sum the previous result)
         DataStream<Tuple2<String, Integer>> comment24Hour = commentHour
                 .keyBy(0)
                 .timeWindow(Time.hours(24))
-                .sum(1).setParallelism(2);
+                .sum(1).setParallelism(3);
 
         //counts comments arrived in 7 days for each article
         //(sum the previous result)
         DataStream<Tuple2<String, Integer>> comment7Days = comment24Hour
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
-                .sum(1).setParallelism(2);
+                .sum(1).setParallelism(3);
 
 
         //get ranking in one hour
@@ -90,21 +96,22 @@ public class Query1 {
 
 
         /*Send results on KAFKA (real-time)*/
-/*        rankingHour
-                .map(new CreateString())
+        rankingHour
+                .map(new CreateString()).setParallelism(4)
                 .addSink(myProducerHour).setParallelism(1);
 
         ranking24
-                .map(new CreateString())
-                .addSink(myProducer24);
+                .map(new CreateString()).setParallelism(4)
+                .addSink(myProducer24).setParallelism(1);
 
         ranking7Days
-                .map(new CreateString())
-                .addSink(myProducer7);*/
+                .map(new CreateString()).setParallelism(4)
+                .addSink(myProducer7).setParallelism(1);
 
 
 
         /*write results on FILE*/
+/*
         rankingHour
                 .map(new CreateString())
                 .writeAsText("./results/query1-one-hour-rank").setParallelism(1);
@@ -115,6 +122,7 @@ public class Query1 {
         ranking7Days
                 .map(new CreateString())
                 .writeAsText("./results/query1-7-days-rank").setParallelism(1);
+*/
 
 
 
@@ -123,14 +131,16 @@ public class Query1 {
 
     //set One for the next operation
     private static class OneSetter implements MapFunction<ObjectNode, Tuple2<String,Integer>> {
+
         @Override
         public Tuple2<String, Integer> map(ObjectNode jsonNodes) throws Exception {
             String articleId = jsonNodes.get("value").get("articleId").asText();
-
             return new Tuple2<>(articleId, 1);
         }
 
     }
+
+
 
 
     //sort the pairs <article, number of comments> to create the ranking
@@ -164,6 +174,42 @@ public class Query1 {
             }
 
             return print.toString();
+        }
+    }
+
+
+    //set One for the next operation
+    private static class OneSetterAndLatency implements MapFunction<ObjectNode, Tuple3<String,Integer,Long>> {
+
+        @Override
+        public Tuple3<String, Integer,Long> map(ObjectNode jsonNodes) throws Exception {
+            String articleId = jsonNodes.get("value").get("articleId").asText();
+            long entryTime = jsonNodes.get("entryTimeTuple").asLong();
+            long latencyMilliSec = System.nanoTime()-entryTime;
+            //System.out.println("LATENCY QUERY1: "+ (System.nanoTime()-entryTime)+ " valore entryTime : "+ entryTime);
+            return new Tuple3<>(articleId, 1, latencyMilliSec);
+        }
+
+    }
+
+    //get latency for each tuple (milliseconds)
+    private static class LatencyGetterMilliSec implements MapFunction<ObjectNode, Tuple3<String,Integer,Long>> {
+        @Override
+        public Tuple3<String,Integer,Long> map(ObjectNode jsonNodes) throws Exception {
+            String articleId = jsonNodes.get("value").get("articleId").asText();
+            long entryTime = jsonNodes.get("entryTimeTuple").asLong();
+
+            return new Tuple3<>(articleId, 1,System.nanoTime()-entryTime);
+        }
+    }
+
+    //print mean of 500 tuple
+    private static class LatencyPrinter implements MapFunction< Tuple3<String,Integer,Long>, Void> {
+        @Override
+        public Void map( Tuple3<String,Integer,Long> latencyOf100Tuples) throws Exception {
+
+            System.out.format("LATENCY QUERY1: %d %n",latencyOf100Tuples.f2/500);
+            return null;
         }
     }
 }

@@ -9,8 +9,10 @@ import javax.annotation.Nullable;
  */
 public class GetterEventTImeAndWatermark implements AssignerWithPunctuatedWatermarks<ObjectNode> {
     private long timestampStreamCompliant=0;
+    public long initialTimestamp;
 
     public GetterEventTImeAndWatermark() {
+
     }
 
     @Nullable
@@ -25,10 +27,15 @@ public class GetterEventTImeAndWatermark implements AssignerWithPunctuatedWaterm
         try {
             timestamp = jsonNodes.get("value").get("createDate").asLong();
             timestampStreamCompliant = timestamp;
+            initialTimestamp=System.nanoTime();
         } catch (Exception e){
             return timestampStreamCompliant; // RETURN PREVIOUS TIMESTAMP COMPLIANT
         }
 
         return timestampStreamCompliant;
+    }
+
+    public long getInitialTime(){
+        return initialTimestamp;
     }
 }
