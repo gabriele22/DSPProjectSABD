@@ -102,15 +102,15 @@ public class Query1 {
 
         /*Send results on KAFKA (real-time)*/
         rankingHour
-                .map(new CreateString()).setParallelism(4)
+                .map(new CreateString()).setParallelism(3)
                 .addSink(myProducerHour).setParallelism(1);
 
         ranking24
-                .map(new CreateString()).setParallelism(4)
+                .map(new CreateString()).setParallelism(3)
                 .addSink(myProducer24).setParallelism(1);
 
         ranking7Days
-                .map(new CreateString()).setParallelism(4)
+                .map(new CreateString()).setParallelism(3)
                 .addSink(myProducer7).setParallelism(1);
 
 
