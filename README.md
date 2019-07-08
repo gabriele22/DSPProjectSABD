@@ -30,7 +30,7 @@ Execute this command to start the **Generator** and **First Query**:
 ```bash
 sh startGeneratorAndFirstQuery.sh  true
 ```
-(if you don't want to activate tracking, **don't enter true**)
+(if you don't want to activate custom latency tracking, **don't enter true**)
 
 Execute this command to view all results (in 3 tab of your terminal):
 ```bash
@@ -48,7 +48,7 @@ Execute this command to start the **Generator** and **Second Query**:
 ```bash
 sh startGeneratorAndSecondQuery.sh  true
 ```
-(if you don't want to activate tracking, **don't enter true**)
+(if you don't want to activate custom latency tracking, **don't enter true**)
 
 Execute this command to view all results (in 3 tab of your terminal):
 ```bash
@@ -60,7 +60,7 @@ Execute this command to view mean latency of last 500 tuple:
 sh viewLatencySecondQuery.sh
 ```
 
-## Access Flink Web Dashboar
+## Access Flink Web Dashboard
 To access the **Apache Flink Web Dashboard** copy this link on your browser: 
 <http://localhost:8081/> 
 
