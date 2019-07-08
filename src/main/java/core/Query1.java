@@ -12,6 +12,8 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.flink.util.Collector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import utils.GetterFlinkKafkaProducer;
 
 import java.util.*;
@@ -35,11 +37,14 @@ public class Query1 {
 
         //if latency required, this part replicate transformation before tuples enter in a timing window
         if(latency){
+            FlinkKafkaProducer<String> myProducerLatency = GetterFlinkKafkaProducer
+                    .getConsumer(ConfigurationKafka.TOPIC_LATENCY_1_);
             commentCompliant
-                    .map(new LatencyGetterMilliSec()).setParallelism(3)
+                    .map(new LatencyGetter()).setParallelism(3)
                     .countWindowAll(500)
                     .sum(2)
-                    .map(new LatencyPrinter());
+                    .map(new LatencyPrinter()).setParallelism(1)
+                    .addSink(myProducerLatency);
         }
 
 
@@ -178,22 +183,9 @@ public class Query1 {
     }
 
 
-    //set One for the next operation
-    private static class OneSetterAndLatency implements MapFunction<ObjectNode, Tuple3<String,Integer,Long>> {
-
-        @Override
-        public Tuple3<String, Integer,Long> map(ObjectNode jsonNodes) throws Exception {
-            String articleId = jsonNodes.get("value").get("articleId").asText();
-            long entryTime = jsonNodes.get("entryTimeTuple").asLong();
-            long latencyMilliSec = System.nanoTime()-entryTime;
-            //System.out.println("LATENCY QUERY1: "+ (System.nanoTime()-entryTime)+ " valore entryTime : "+ entryTime);
-            return new Tuple3<>(articleId, 1, latencyMilliSec);
-        }
-
-    }
 
     //get latency for each tuple (milliseconds)
-    private static class LatencyGetterMilliSec implements MapFunction<ObjectNode, Tuple3<String,Integer,Long>> {
+    private static class LatencyGetter implements MapFunction<ObjectNode, Tuple3<String,Integer,Long>> {
         @Override
         public Tuple3<String,Integer,Long> map(ObjectNode jsonNodes) throws Exception {
             String articleId = jsonNodes.get("value").get("articleId").asText();
@@ -204,12 +196,15 @@ public class Query1 {
     }
 
     //print mean of 500 tuple
-    private static class LatencyPrinter implements MapFunction< Tuple3<String,Integer,Long>, Void> {
+    private static class LatencyPrinter implements MapFunction< Tuple3<String,Integer,Long>, String> {
         @Override
-        public Void map( Tuple3<String,Integer,Long> latencyOf100Tuples) throws Exception {
+        public String map( Tuple3<String,Integer,Long> latencyOf500Tuples) throws Exception {
+/*            Logger logger = LoggerFactory.getLogger(Query2.class);
 
-            System.out.format("LATENCY QUERY1: %d %n",latencyOf100Tuples.f2/500);
-            return null;
+            logger.info("MEAN LATENCY QUERY1 :" +latencyOf500Tuples.f2/500+ " ns" );*/
+            String print = "MEAN LATENCY QUERY2 :" +latencyOf500Tuples.f2/500+ " ns";
+            //System.out.printf("MEAN LATENCY QUERY1 : %d \n",latencyOf500Tuples.f2/500);
+            return print;
         }
     }
 }

@@ -37,10 +37,8 @@ public class KakfaCommentProducer {
 
             RecordMetadata metadata = producer.send(record).get();
 
-            // DEBUG
             System.out.printf("sent record(key=%s value=%s) meta(partition=%d, offset=%d)\n",
                     record.key(), record.value(), metadata.partition(), metadata.offset());
-
 
         } catch (InterruptedException e) {
             e.printStackTrace();

@@ -4,18 +4,16 @@ public class ConfigurationKafka {
 
       /*LOCAL MODE */
 
-    private static final String KAFKA_BROKER_0 = "localhost:9092";
+/*    private static final String KAFKA_BROKER_0 = "localhost:9092";
     private static final String KAFKA_BROKER_1 = "localhost:9093";
     private static final String KAFKA_BROKER_2 = "localhost:9094";
-    public static final String ZOOKEEPER = "localhost:2181";
+    public static final String ZOOKEEPER = "localhost:2181";*/
 
     /*DOCKER CLUSTER MODE */
-/*
     private static final String KAFKA_BROKER_0 = "kafka0:9092";
     private static final String KAFKA_BROKER_1 = "kafka1:9093";
     private static final String KAFKA_BROKER_2 = "kafka2:9094";
     public static final String ZOOKEEPER = "zookeeper:2181";
-*/
 
 
     private static final String SEP = ",";
@@ -36,6 +34,11 @@ public class ConfigurationKafka {
     public static final String TOPIC_QUERY_TWO_24_HOUR_ = "query2-24-hours";
     public static final String TOPIC_QUERY_TWO_7_DAYS_ = "query2-7-days";
     public static final String TOPIC_QUERY_TWO_30_DAYS_ = "query2-30-days";
+
+
+    //LATENCY
+    public static final String TOPIC_LATENCY_1_ = "latency-query-1";
+    public static final String TOPIC_LATENCY_2_ = "latency-query-2";
 
 
 
