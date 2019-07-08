@@ -60,7 +60,7 @@ Execute this command to view mean latency of last 500 tuple:
 sh viewLatencySecondQuery.sh
 ```
 
-##ACCESS FLINK WEB DASHBOARD
+## Access Flink Web Dashboar
 To access the **Apache Flink Web Dashboard** copy this link on your browser: 
 <http://localhost:8081/> 
 
