@@ -11,6 +11,17 @@ public class FindCorruptComment implements FilterFunction<ObjectNode> {
     @Override
     public boolean filter(ObjectNode jsonNodes) throws Exception {
         Comment comment;
+
+
+        //if key/value is not present it means that tuple is corrupt
+        try {
+            jsonNodes.get("key");
+            jsonNodes.get("value");
+        }catch (Exception e){
+            return false;
+        }
+
+
         //if all field of comment is not present it means that comment is corrupt
         try {
             comment = new Comment(jsonNodes.get("value").get("approveDate").asText(), jsonNodes.get("value").get("articleId").asText(),
@@ -23,6 +34,7 @@ public class FindCorruptComment implements FilterFunction<ObjectNode> {
         } catch (Exception e) {
             return false;
         }
+
 
         //getter of Comment class cast string value in specific type or class
         //if at least one exception is launch, it means that comment is corrupt
