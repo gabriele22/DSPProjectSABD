@@ -12,8 +12,6 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.flink.util.Collector;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import utils.GetterFlinkKafkaProducer;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -39,8 +37,8 @@ public class Query2 {
                     .getConsumer(ConfigurationKafka.TOPIC_LATENCY_2_);
 
             commentCompliant
-                    .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(3)
-                    .map(new LatencyGetter()).setParallelism(3)
+                    .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(2)
+                    .map(new LatencyGetter()).setParallelism(2)
                     .countWindowAll(500)
                     .sum(2)
                     .map(new LatencyPrinter()).setParallelism(1)
@@ -49,14 +47,14 @@ public class Query2 {
 
         //map 0.hour 1.numCommentsOnTwoHours
         DataStream<Tuple2<String,Integer>> coupleHourOne = commentCompliant
-                .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(3)
-                .map(new SetterKeyAndOne()).setParallelism(3);
+                .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(2)
+                .map(new SetterKeyAndOne()).setParallelism(2);
 
         //count number of DIRECT comments in two hours
         DataStream<Tuple2<String,Integer>> numCommentOnTwoHour= coupleHourOne
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.hours(2)))
-                .sum(1).setParallelism(3);
+                .sum(1).setParallelism(2);
 
 
         //get ordered result of  24 hour window
@@ -68,7 +66,7 @@ public class Query2 {
         DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments7Days= numCommentOnTwoHour
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
-                .sum(1).setParallelism(3)
+                .sum(1).setParallelism(2)
                 .windowAll(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
                 .process(new SortResultsAndTakeInitialWindowTime());
 
@@ -77,7 +75,7 @@ public class Query2 {
         DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numCommentsMonth= numCommentOnTwoHour
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
-                .sum(1).setParallelism(3)
+                .sum(1).setParallelism(2)
                 .windowAll(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
                 .process(new SortResultsAndTakeInitialWindowTime());
 
@@ -90,11 +88,11 @@ public class Query2 {
 
         /*Send results on KAFKA (real-time)*/
         numComments24Hours
-                .map(new CreateString()).setParallelism(3)
+                .map(new CreateString()).setParallelism(2)
                 .addSink(myProducer24).setParallelism(1);
-        numComments7Days.map(new CreateString()).setParallelism(3)
+        numComments7Days.map(new CreateString()).setParallelism(2)
                 .addSink(myProducer7).setParallelism(1);
-        numCommentsMonth.map(new CreateString()).setParallelism(3)
+        numCommentsMonth.map(new CreateString()).setParallelism(2)
                 .addSink(myProducer30).setParallelism(1);
 
 
@@ -193,11 +191,7 @@ public class Query2 {
     private static class LatencyPrinter implements MapFunction<Tuple3<String,Integer,Long>, String> {
         @Override
         public String map(Tuple3<String,Integer,Long> latencyOf500Tuples) throws Exception {
-/*            Logger logger = LoggerFactory.getLogger(Query2.class);
-
-            logger.info("MEAN LATENCY QUERY2 :" +latencyOf500Tuples.f2/500+ " ns" );*/
             String print = "MEAN LATENCY QUERY2 :" +latencyOf500Tuples.f2/500+ " ns";
-        //    System.out.printf("MEAN LATENCY QUERY2 : %d ",latencyOf500Tuples.f2/500);
             return print;
         }
     }

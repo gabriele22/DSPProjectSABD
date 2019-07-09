@@ -12,9 +12,8 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.flink.util.Collector;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import utils.GetterFlinkKafkaProducer;
+import utils.MyMapper;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -40,52 +39,50 @@ public class Query1 {
             FlinkKafkaProducer<String> myProducerLatency = GetterFlinkKafkaProducer
                     .getConsumer(ConfigurationKafka.TOPIC_LATENCY_1_);
             commentCompliant
-                    .map(new LatencyGetter()).setParallelism(3)
+                    .map(new LatencyGetter()).setParallelism(2)
                     .countWindowAll(500)
                     .sum(2)
                     .map(new LatencyPrinter()).setParallelism(1)
                     .addSink(myProducerLatency);
+
+
         }
 
 
         //counts comments arrived in one hour for each article
         //map  0.articleId 1.counts
         DataStream<Tuple2<String, Integer>> cupleArticleIdOne = commentCompliant
-                    .map(new OneSetter()).setParallelism(3);
-
-
+                    .map(new OneSetter()).setParallelism(2);
 
         DataStream<Tuple2<String, Integer>>commentHour = cupleArticleIdOne
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.hours(1)))
-                .sum(1).setParallelism(3);
+                .sum(1).setParallelism(2);
+
         //counts comments arrived in 24 hours for each article
         //(sum the previous result)
         DataStream<Tuple2<String, Integer>> comment24Hour = commentHour
                 .keyBy(0)
                 .timeWindow(Time.hours(24))
-                .sum(1).setParallelism(3);
+                .sum(1).setParallelism(2);
 
         //counts comments arrived in 7 days for each article
         //(sum the previous result)
         DataStream<Tuple2<String, Integer>> comment7Days = comment24Hour
                 .keyBy(0)
                 .window(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
-                .sum(1).setParallelism(3);
+                .sum(1).setParallelism(2);
 
 
         //get ranking in one hour
         DataStream<Tuple2<Date, List<Tuple2<String, Integer>>>> rankingHour = commentHour
-                //.keyBy(0)
                 .windowAll(TumblingEventTimeWindows.of(Time.hours(1)))
                 .process(new Ranking()).setParallelism(1);
-
 
         //get ranking in 24 hours
         DataStream<Tuple2<Date, List<Tuple2<String, Integer>>>> ranking24 = comment24Hour
                 .timeWindowAll(Time.hours(24))
                 .process(new Ranking()).setParallelism(1);
-
 
         //get ranking in 7 days
         DataStream<Tuple2<Date, List<Tuple2<String, Integer>>>> ranking7Days = comment7Days
@@ -94,7 +91,7 @@ public class Query1 {
 
 
 
-        //send results as String on Kafka
+        //Kafka producers
         FlinkKafkaProducer<String> myProducerHour = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_ONE_HOUR_);
         FlinkKafkaProducer<String> myProducer24 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_ONE_24_HOURS_);
         FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_ONE_7_DAYS_);
@@ -102,16 +99,21 @@ public class Query1 {
 
         /*Send results on KAFKA (real-time)*/
         rankingHour
-                .map(new CreateString()).setParallelism(3)
+                .map(new CreateString()).setParallelism(2)
                 .addSink(myProducerHour).setParallelism(1);
 
         ranking24
-                .map(new CreateString()).setParallelism(3)
+                .map(new CreateString()).setParallelism(2)
                 .addSink(myProducer24).setParallelism(1);
 
         ranking7Days
-                .map(new CreateString()).setParallelism(3)
+                .map(new CreateString()).setParallelism(2)
                 .addSink(myProducer7).setParallelism(1);
+
+
+        MyMapper cpuMap= new MyMapper();
+
+        rankingHour.map(new CreateString()).map(cpuMap);
 
 
 
@@ -199,12 +201,9 @@ public class Query1 {
     private static class LatencyPrinter implements MapFunction< Tuple3<String,Integer,Long>, String> {
         @Override
         public String map( Tuple3<String,Integer,Long> latencyOf500Tuples) throws Exception {
-/*            Logger logger = LoggerFactory.getLogger(Query2.class);
-
-            logger.info("MEAN LATENCY QUERY1 :" +latencyOf500Tuples.f2/500+ " ns" );*/
             String print = "MEAN LATENCY QUERY2 :" +latencyOf500Tuples.f2/500+ " ns";
-            //System.out.printf("MEAN LATENCY QUERY1 : %d \n",latencyOf500Tuples.f2/500);
             return print;
         }
     }
+
 }

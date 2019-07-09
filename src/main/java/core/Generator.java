@@ -135,12 +135,6 @@ public class Generator implements Runnable{
 
 
     public static void main(String[] args) {
-
-        /* TODO:
-         * Usage:
-         * java -jar debs2015gc-1.0.jar it.uniroma2.debs2016gc.DataSource [debs dataset] [redis ip]
-         */
-
         String fileCSV = args[0];
         Generator fill = new Generator (fileCSV);
         Thread th1 = new Thread(fill);

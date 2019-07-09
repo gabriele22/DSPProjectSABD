@@ -82,9 +82,10 @@ public class Starter {
             }
 
         }
+
+
         if(args[0].equalsIgnoreCase("Query2")) {
             Query2.startQuery2(commentCompliant, latencyTracking);
-
 
             try {
                 env.execute("SABD_project_query_2");
