@@ -20,7 +20,7 @@ public class DeserializationAndAddEntryTime extends JSONKeyValueDeserializationS
             this.mapperT = new ObjectMapper();
         }
 
-        deserialize.set("entryTimeTuple", this.mapperT.readValue(String.valueOf(System.nanoTime()), JsonNode.class));
+        deserialize.set("entryTimeTuple", this.mapperT.readValue(String.valueOf(System.currentTimeMillis()), JsonNode.class));
 
         return deserialize;
     }

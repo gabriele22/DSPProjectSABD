@@ -42,13 +42,15 @@ public class Starter {
 
         }
 
+
+
+
         //initialize kafka properties
         Properties props = InitializerKafka.initialize();
 
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-
 
         //read json object from kafka
         DeserializationAndAddEntryTime deserializationAndAddEntryTime = new DeserializationAndAddEntryTime(false);

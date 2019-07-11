@@ -2,10 +2,12 @@ package core;
 
 import config.ConfigurationKafka;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
@@ -36,13 +38,16 @@ public class Query2 {
             FlinkKafkaProducer<String> myProducerLatency = GetterFlinkKafkaProducer
                     .getConsumer(ConfigurationKafka.TOPIC_LATENCY_2_);
 
-            commentCompliant
-                    .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(2)
+            //count number of DIRECT comments in two hours
+            SingleOutputStreamOperator<Tuple3<String, Integer, Long>> numCommentOnTwoHourAndLatency = commentCompliant
+                    .filter(x -> x.get("value").get("depth").asInt() == 1).setParallelism(2)
                     .map(new LatencyGetter()).setParallelism(2)
-                    .countWindowAll(500)
-                    .sum(2)
-                    .map(new LatencyPrinter()).setParallelism(1)
-                    .addSink(myProducerLatency);
+                    .keyBy(0)
+                    .window(TumblingEventTimeWindows.of(Time.hours(2)))
+                    .reduce(new SumAndGetMaxEntryTime());
+
+
+
         }
 
         //map 0.hour 1.numCommentsOnTwoHours
@@ -163,6 +168,8 @@ public class Query2 {
     }
 
 
+    /////////////////////////////// SAME METHOD with LATENCY ///////////////////////////////////////////
+
     //get latency for each tuple (milliseconds)
     private static class LatencyGetter implements MapFunction<ObjectNode, Tuple3<String,Integer,Long>> {
         @Override
@@ -183,20 +190,20 @@ public class Query2 {
 
 
 
-            return new Tuple3<>(hourKey,1,System.nanoTime()-entryTime);
+            return new Tuple3<>(hourKey,1, entryTime);
         }
     }
 
-    //print mean of 500 tuple
-    private static class LatencyPrinter implements MapFunction<Tuple3<String,Integer,Long>, String> {
+    private static class SumAndGetMaxEntryTime implements ReduceFunction<Tuple3<String, Integer, Long>> {
         @Override
-        public String map(Tuple3<String,Integer,Long> latencyOf500Tuples) throws Exception {
-            String print = "MEAN LATENCY QUERY2 :" +latencyOf500Tuples.f2/500+ " ns";
-            return print;
+        public Tuple3<String, Integer, Long> reduce(Tuple3<String, Integer, Long> tuple1, Tuple3<String, Integer, Long> tuple2) throws Exception {
+
+
+            return new Tuple3<>(tuple1.f0,tuple1.f1+tuple2.f1,Math.max(tuple1.f2,tuple2.f2));
         }
     }
-
 }
+
 
 
 
