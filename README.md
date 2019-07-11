@@ -3,7 +3,7 @@
 The goal of this project is to answer the first two queries in the document: <https://drive.google.com/file/d/1mVxpYWk_OQdDZBCSqUck_pTQ8WwbEC21/view?usp=sharing>.
 Furthermore it is possible to create a standalone cluster with docker and docker-compose to test everything.
 
-##Core Components
+## Core Components
 * The **Generator** will replicate the data on kafka topic "comments"
   * between sending a comment and the next one will wait a number of milliseconds equal to the number of minutes between the creation date of the two comments
 * **Query** will read the data from the topic "comments" and publishing the results on others kafka topics 
