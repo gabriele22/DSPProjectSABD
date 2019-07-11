@@ -14,6 +14,7 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaProducer;
 import org.apache.flink.util.Collector;
+import org.apache.kafka.common.protocol.types.Field;
 import utils.GetterFlinkKafkaProducer;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -33,13 +34,13 @@ public class Query2 {
 
     public static void startQuery2( DataStream<ObjectNode> commentCompliant, boolean latency){
 
-        //if latency required, this part replicate transformation before tuples enter in a timing window
+        //if LATENCY required, this part replicate all transformation adding latency count
         if(latency){
             FlinkKafkaProducer<String> myProducerLatency = GetterFlinkKafkaProducer
                     .getConsumer(ConfigurationKafka.TOPIC_LATENCY_2_);
 
-            //count number of DIRECT comments in two hours
-            SingleOutputStreamOperator<Tuple3<String, Integer, Long>> numCommentOnTwoHourAndLatency = commentCompliant
+            //count number of DIRECT comments in two hours and get max entry Time
+            SingleOutputStreamOperator<Tuple3<String, Integer, Long>> numCommentOnTwoHourAndEntryTime = commentCompliant
                     .filter(x -> x.get("value").get("depth").asInt() == 1).setParallelism(2)
                     .map(new LatencyGetter()).setParallelism(2)
                     .keyBy(0)
@@ -47,61 +48,96 @@ public class Query2 {
                     .reduce(new SumAndGetMaxEntryTime());
 
 
+            //get ordered result of  24 hour window
+            DataStream<Tuple3<String, List<Tuple2<String,Integer>>,Long>> numComments24HoursAndLatency = numCommentOnTwoHourAndEntryTime
+                    .windowAll(TumblingEventTimeWindows.of(Time.hours(24)))
+                    .process(new SortResultsTakeInitialWindowTimeAndLatency());
 
-        }
+            DataStream<Tuple3<String, List<Tuple2<String,Integer>>,Long>> numComments7DaysAndLatency= numCommentOnTwoHourAndEntryTime
+                    .keyBy(0)
+                    .window(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
+                    .reduce(new SumAndGetMaxEntryTime())
+                    .windowAll(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
+                    .process(new SortResultsTakeInitialWindowTimeAndLatency());
 
-        //map 0.hour 1.numCommentsOnTwoHours
-        DataStream<Tuple2<String,Integer>> coupleHourOne = commentCompliant
-                .filter(x-> x.get("value").get("depth").asInt()==1).setParallelism(2)
-                .map(new SetterKeyAndOne()).setParallelism(2);
-
-        //count number of DIRECT comments in two hours
-        DataStream<Tuple2<String,Integer>> numCommentOnTwoHour= coupleHourOne
-                .keyBy(0)
-                .window(TumblingEventTimeWindows.of(Time.hours(2)))
-                .sum(1).setParallelism(2);
-
-
-        //get ordered result of  24 hour window
-        DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments24Hours = numCommentOnTwoHour
-                .windowAll(TumblingEventTimeWindows.of(Time.hours(24)))
-                .process(new SortResultsAndTakeInitialWindowTime());
-
-        //count comments on two hours for 7 days and get ordered result
-        DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numComments7Days= numCommentOnTwoHour
-                .keyBy(0)
-                .window(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
-                .sum(1).setParallelism(2)
-                .windowAll(TumblingEventTimeWindows.of(Time.days(7),Time.days(-3)))
-                .process(new SortResultsAndTakeInitialWindowTime());
+            //count comments on two hours for month and get ordered result
+            DataStream<Tuple3<String, List<Tuple2<String,Integer>>,Long>> numCommentsMonthAndLatency= numCommentOnTwoHourAndEntryTime
+                    .keyBy(0)
+                    .window(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
+                    .reduce(new SumAndGetMaxEntryTime())
+                    .windowAll(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
+                    .process(new SortResultsTakeInitialWindowTimeAndLatency());
 
 
-        //count comments on two hours for month and get ordered result
-        DataStream<Tuple2<String, List<Tuple2<String,Integer>>>> numCommentsMonth= numCommentOnTwoHour
-                .keyBy(0)
-                .window(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
-                .sum(1).setParallelism(2)
-                .windowAll(TumblingEventTimeWindows.of(Time.days(30),Time.days(12)))
-                .process(new SortResultsAndTakeInitialWindowTime());
+            //kafka producers
+            FlinkKafkaProducer<String> myProducer24 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_24_HOUR_);
+            FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_7_DAYS_);
+            FlinkKafkaProducer<String> myProducer30 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_30_DAYS_);
+
+            /*Send results on KAFKA (real-time)*/
+            numComments24HoursAndLatency
+                    .map(new CreateStringWithLatency()).setParallelism(2)
+                    .addSink(myProducer24).setParallelism(1);
+            numComments7DaysAndLatency.map(new CreateStringWithLatency()).setParallelism(2)
+                    .addSink(myProducer7).setParallelism(1);
+            numCommentsMonthAndLatency.map(new CreateStringWithLatency()).setParallelism(2)
+                    .addSink(myProducer30).setParallelism(1);
 
 
 
-        //kafka producers
-        FlinkKafkaProducer<String> myProducer24 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_24_HOUR_);
-        FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_7_DAYS_);
-        FlinkKafkaProducer<String> myProducer30 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_30_DAYS_);
+        }else {// WITHOUT LATENCY
 
-        /*Send results on KAFKA (real-time)*/
-        numComments24Hours
-                .map(new CreateString()).setParallelism(2)
-                .addSink(myProducer24).setParallelism(1);
-        numComments7Days.map(new CreateString()).setParallelism(2)
-                .addSink(myProducer7).setParallelism(1);
-        numCommentsMonth.map(new CreateString()).setParallelism(2)
-                .addSink(myProducer30).setParallelism(1);
+            //map 0.hour 1.numCommentsOnTwoHours
+            DataStream<Tuple2<String, Integer>> coupleHourOne = commentCompliant
+                    .filter(x -> x.get("value").get("depth").asInt() == 1).setParallelism(2)
+                    .map(new SetterKeyAndOne()).setParallelism(2);
+
+            //count number of DIRECT comments in two hours
+            DataStream<Tuple2<String, Integer>> numCommentOnTwoHour = coupleHourOne
+                    .keyBy(0)
+                    .window(TumblingEventTimeWindows.of(Time.hours(2)))
+                    .sum(1).setParallelism(2);
 
 
-        /*write results on FILE*/
+            //get ordered result of  24 hour window
+            DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> numComments24Hours = numCommentOnTwoHour
+                    .windowAll(TumblingEventTimeWindows.of(Time.hours(24)))
+                    .process(new SortResultsAndTakeInitialWindowTime());
+
+            //count comments on two hours for 7 days and get ordered result
+            DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> numComments7Days = numCommentOnTwoHour
+                    .keyBy(0)
+                    .window(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
+                    .sum(1).setParallelism(2)
+                    .windowAll(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
+                    .process(new SortResultsAndTakeInitialWindowTime());
+
+
+            //count comments on two hours for month and get ordered result
+            DataStream<Tuple2<String, List<Tuple2<String, Integer>>>> numCommentsMonth = numCommentOnTwoHour
+                    .keyBy(0)
+                    .window(TumblingEventTimeWindows.of(Time.days(30), Time.days(12)))
+                    .sum(1).setParallelism(2)
+                    .windowAll(TumblingEventTimeWindows.of(Time.days(30), Time.days(12)))
+                    .process(new SortResultsAndTakeInitialWindowTime());
+
+
+            //kafka producers
+            FlinkKafkaProducer<String> myProducer24 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_24_HOUR_);
+            FlinkKafkaProducer<String> myProducer7 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_7_DAYS_);
+            FlinkKafkaProducer<String> myProducer30 = GetterFlinkKafkaProducer.getConsumer(ConfigurationKafka.TOPIC_QUERY_TWO_30_DAYS_);
+
+            /*Send results on KAFKA (real-time)*/
+            numComments24Hours
+                    .map(new CreateString()).setParallelism(2)
+                    .addSink(myProducer24).setParallelism(1);
+            numComments7Days.map(new CreateString()).setParallelism(2)
+                    .addSink(myProducer7).setParallelism(1);
+            numCommentsMonth.map(new CreateString()).setParallelism(2)
+                    .addSink(myProducer30).setParallelism(1);
+
+
+            /*write results on FILE*/
 /*        numComments24Hours
                 .map(new CreateString()).writeAsText("./results/query2-24-hours").setParallelism(1);
         numComments7Days
@@ -110,6 +146,7 @@ public class Query2 {
                 .map(new CreateString()).writeAsText("./results/query2-30-days").setParallelism(1);*/
 
 
+        }
     }
 
 
@@ -200,6 +237,50 @@ public class Query2 {
 
 
             return new Tuple3<>(tuple1.f0,tuple1.f1+tuple2.f1,Math.max(tuple1.f2,tuple2.f2));
+        }
+    }
+
+    private static class SortResultsTakeInitialWindowTimeAndLatency extends ProcessAllWindowFunction<Tuple3<String, Integer, Long>,  Tuple3<String, List<Tuple2<String,Integer>>, Long>, TimeWindow> {
+
+
+        @Override
+        public void process(Context context, Iterable<Tuple3<String, Integer, Long>> iterable, Collector<Tuple3<String, List<Tuple2<String,Integer>>, Long>> out) throws Exception {
+
+            List<Long> entryTimeBigger = StreamSupport
+                    .stream(iterable.spliterator(), false)
+                    .sorted((a, b) -> a.f2 > b.f2 ? -1 : a.f2 == b.f2 ? 0 : 1)
+                    .limit(1)
+                    .map(x-> x.f2)
+                    .collect(Collectors.toList());
+
+            long latency = System.currentTimeMillis() - entryTimeBigger.get(0);
+
+
+            List<Tuple2<String,Integer>> countList = StreamSupport
+                    .stream(iterable.spliterator(), false)
+                    .sorted(Comparator.comparing(x -> x.f0))
+                    .map(x-> new Tuple2<>(x.f0,x.f1))
+                    .collect(Collectors.toList());
+
+            String initialTimestamp = new Date(context.window().getStart()).toString();
+
+            out.collect(new Tuple3<>(initialTimestamp, countList, latency));
+        }
+    }
+
+    private static class CreateStringWithLatency implements MapFunction<Tuple3<String, List<Tuple2<String, Integer>>, Long>, String> {
+        @Override
+        public String map(Tuple3<String, List<Tuple2<String, Integer>>, Long> tuple) throws Exception {
+
+            StringBuilder print = new StringBuilder();
+            print.append(tuple.f0.toString());
+            print.append(" --> ");
+            for(Tuple2<String, Integer> t: tuple.f1){
+                print.append("{").append(t.f0).append(", count = ").append(t.f1).append("} ");
+            }
+
+            print.append("Latency = ").append(tuple.f2);
+            return print.toString();
         }
     }
 }

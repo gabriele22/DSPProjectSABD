@@ -4,10 +4,10 @@ The goal of this project is to answer the first two queries in the document: <ht
 Furthermore it is possible to create a standalone cluster with docker and docker-compose to test everything.
 
 ##Core Components
-* The **Generator** will replicate the data on a kafka topic
+* The **Generator** will replicate the data on kafka topic "comments"
   * between sending a comment and the next one will wait a number of milliseconds equal to the number of minutes between the creation date of the two comments
-* **Query** will read the data from the topic kafka and publishing the results on other kafka topics 
-  * one topic for each window of each query (+ latency topic)
+* **Query** will read the data from the topic "comments" and publishing the results on others kafka topics 
+  * one topic for each window of each query (6 topic)
 
 ## Pre requisites
 You need to have installed:
@@ -25,40 +25,18 @@ In the directory created, open a terminal and execute this command:
 sh launchEnvironment.sh  /yourPathFileDataset/..
 ```
 
-## Usage FIRST QUERY 
-Execute this command to start the **Generator** and **First Query**: 
+## Usage  
+Execute this command to start the **Generator** and **Queries**: 
 ```bash
-sh startGeneratorAndFirstQuery.sh  true
+sh startGeneratorAndQueries.sh  true
 ```
 (if you don't want to activate custom latency tracking, **don't enter true**)
 
-Execute this command to view all results (in 3 tab of your terminal):
+Execute this command to view all results (in 6 tab of your terminal):
 ```bash
-sh viewResultsFirstQuery.sh
+sh viewResults.sh
 ```
 
-Execute this command to view mean latency of last 500 tuple:
-```bash
-sh viewLatencyFirstQuery.sh
-```
-
-## Usage SECOND QUERY 
-  
-Execute this command to start the **Generator** and **Second Query**: 
-```bash
-sh startGeneratorAndSecondQuery.sh  true
-```
-(if you don't want to activate custom latency tracking, **don't enter true**)
-
-Execute this command to view all results (in 3 tab of your terminal):
-```bash
-sh viewResultsSecondQuery.sh
-```
-
-Execute this command to view mean latency of last 500 tuple:
-```bash
-sh viewLatencySecondQuery.sh
-```
 
 ## Access Flink Web Dashboard
 To access the **Apache Flink Web Dashboard** copy this link on your browser: 
@@ -67,5 +45,5 @@ To access the **Apache Flink Web Dashboard** copy this link on your browser:
 
 ## Stop environment
 ```bash
-sh stopAndClean.sh
+sh stopEnvironment.sh
 ```

@@ -34,35 +34,38 @@ public class Query1 {
         //if LATENCY required, this part replicate all transformation adding latency count
         if(latency){
 
-            DataStream<Tuple3<String, Integer,Long>>commentHourAndLatency =  commentCompliant
+            //counts comments arrived in one hour for each article and max entry Time
+            DataStream<Tuple3<String, Integer,Long>>commentHourAndEntryTime =  commentCompliant
                     .map(new LatencyGetter()).setParallelism(2)
                     .keyBy(0)
                     .window(TumblingEventTimeWindows.of(Time.hours(1)))
                     .reduce(new SumAndGetMaxEntryTime()).setParallelism(2);
 
-            DataStream<Tuple3<String, Integer, Long>> comment24HourAndLatency= commentHourAndLatency
+            //counts comments arrived in 24 hours for each article and max entry Time
+            DataStream<Tuple3<String, Integer, Long>> comment24HourAndEntryTime= commentHourAndEntryTime
                     .keyBy(0)
                     .timeWindow(Time.hours(24))
                     .reduce(new SumAndGetMaxEntryTime()).setParallelism(2);
 
-            DataStream<Tuple3<String, Integer,Long>> comment7DaysAndLatency = comment24HourAndLatency
+            //counts comments arrived in 7 days for each article and max entry Time
+            DataStream<Tuple3<String, Integer,Long>> comment7DaysAndEntryTime = comment24HourAndEntryTime
                     .keyBy(0)
                     .window(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
                     .reduce(new SumAndGetMaxEntryTime()).setParallelism(2);
 
 
             //get ranking in one hour and latency
-            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> rankingHourAndLatency = commentHourAndLatency
+            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> rankingHourAndLatency = commentHourAndEntryTime
                     .windowAll(TumblingEventTimeWindows.of(Time.hours(1)))
                     .process(new RankingAndLatency()).setParallelism(1);
 
             //get ranking in 24 hours and latency
-            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> ranking24AndLatency = comment24HourAndLatency
+            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> ranking24AndLatency = comment24HourAndEntryTime
                     .timeWindowAll(Time.hours(24))
                     .process(new RankingAndLatency()).setParallelism(1);
 
             //get ranking in 7 days and latency
-            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>>ranking7DaysAndLatency = comment7DaysAndLatency
+            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>>ranking7DaysAndLatency = comment7DaysAndEntryTime
                     .windowAll(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
                     .process(new RankingAndLatency()).setParallelism(1);
 
@@ -239,6 +242,15 @@ public class Query1 {
         }
     }
 
+    private static class SumAndGetMaxEntryTime implements ReduceFunction<Tuple3<String, Integer, Long>> {
+        @Override
+        public Tuple3<String, Integer, Long> reduce(Tuple3<String, Integer, Long> tuple1, Tuple3<String, Integer, Long> tuple2) throws Exception {
+
+
+            return new Tuple3<>(tuple1.f0,tuple1.f1+tuple2.f1,Math.max(tuple1.f2,tuple2.f2));
+        }
+    }
+
 
     private static class RankingAndLatency extends ProcessAllWindowFunction<Tuple3<String, Integer, Long>,  Tuple3<Date,List<Tuple2<String, Integer>>, Long>, TimeWindow> {
         @Override
@@ -287,12 +299,5 @@ public class Query1 {
         }
     }
 
-    private static class SumAndGetMaxEntryTime implements ReduceFunction<Tuple3<String, Integer, Long>> {
-        @Override
-        public Tuple3<String, Integer, Long> reduce(Tuple3<String, Integer, Long> tuple1, Tuple3<String, Integer, Long> tuple2) throws Exception {
 
-
-            return new Tuple3<>(tuple1.f0,tuple1.f1+tuple2.f1,Math.max(tuple1.f2,tuple2.f2));
-        }
-    }
 }
