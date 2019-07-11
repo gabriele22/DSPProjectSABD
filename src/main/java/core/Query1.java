@@ -55,17 +55,17 @@ public class Query1 {
 
 
             //get ranking in one hour and latency
-            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> rankingHourAndLatency = commentHourAndEntryTime
+            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> rankingHourAndEntryTime = commentHourAndEntryTime
                     .windowAll(TumblingEventTimeWindows.of(Time.hours(1)))
                     .process(new RankingAndLatency()).setParallelism(1);
 
             //get ranking in 24 hours and latency
-            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> ranking24AndLatency = comment24HourAndEntryTime
+            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>> ranking24AndEntryTime = comment24HourAndEntryTime
                     .timeWindowAll(Time.hours(24))
                     .process(new RankingAndLatency()).setParallelism(1);
 
             //get ranking in 7 days and latency
-            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>>ranking7DaysAndLatency = comment7DaysAndEntryTime
+            DataStream<Tuple3<Date, List<Tuple2<String, Integer>>, Long>>ranking7DaysAndEntryTime = comment7DaysAndEntryTime
                     .windowAll(TumblingEventTimeWindows.of(Time.days(7), Time.days(-3)))
                     .process(new RankingAndLatency()).setParallelism(1);
 
@@ -78,15 +78,15 @@ public class Query1 {
 
 
             /*Send results on KAFKA (real-time)*/
-            rankingHourAndLatency
+            rankingHourAndEntryTime
                     .map(new CreateStringWithLatency()).setParallelism(2)
                     .addSink(myProducerHour).setParallelism(1);
 
-            ranking24AndLatency
+            ranking24AndEntryTime
                     .map(new CreateStringWithLatency()).setParallelism(2)
                     .addSink(myProducer24).setParallelism(1);
 
-            ranking7DaysAndLatency
+            ranking7DaysAndEntryTime
                     .map(new CreateStringWithLatency()).setParallelism(2)
                     .addSink(myProducer7).setParallelism(1);
 
@@ -264,7 +264,7 @@ public class Query1 {
                     .map(x-> x.f2)
                     .collect(Collectors.toList());
 
-            long latency = System.currentTimeMillis() - entryTimeBigger.get(0);
+
 
             List<Tuple2<String, Integer>> ranking = StreamSupport
                     .stream(iterable.spliterator(), false)
@@ -275,7 +275,7 @@ public class Query1 {
 
             Date initialTimestamp = new Date(context.window().getStart());
 
-            collector.collect(new Tuple3<>(initialTimestamp, ranking, latency));
+            collector.collect(new Tuple3<>(initialTimestamp, ranking, entryTimeBigger.get(0)));
 
         }
     }
@@ -291,7 +291,9 @@ public class Query1 {
                 print.append("{id = ").append(tuple.f0).append(", n.comm = ").append(tuple.f1).append("} ");
             }
 
-            print.append("Latency = ").append(ranking.f2);
+            long latency = System.currentTimeMillis() - ranking.f2;
+
+            print.append("Latency = ").append(latency);
 
             return print.toString();
 
