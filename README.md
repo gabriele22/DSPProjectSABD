@@ -19,7 +19,7 @@ You need to download dataset file:
 <https://drive.google.com/file/d/1DHyqsNoQVs0waY3q6nCqNKimUuqQLb-D/view?usp=sharing>
 
 ## Launch environment
-First download and unzip the file: <https://drive.google.com/file/d/1dsEvkwntI-bqKXuqIpgOgvUB9YiZJBrF/view?usp=sharing>
+First download and unzip the file: <https://drive.google.com/file/d/1xxnhaOJz90v53Ce9nldS48CVS-Ak0Tyo/view?usp=sharing>
 In the directory created, open a terminal and execute this command:
 ```bash
 sh launchEnvironment.sh  /yourPathFileDataset/..
